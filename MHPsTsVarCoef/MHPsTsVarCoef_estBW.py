@@ -288,12 +288,101 @@ def PR_fit_tvar( q_PR, q_job, q_data, arr_states, proc_id):
 			R0_tstat_est = clf.predict( COV_tstat_X );
 			R0_tstat_est = np.tile( np.expand_dims( R0_tstat_est, axis=0), [ n_hzone, 1] ).flatten(order='F')
 			
-			q_PR.put( (each_t, coef_tvar, coef_tstat, R0_tvar_est, R0_tstat_est ) )
+			# ------ Objective and Gradient for BW ------ #
+					
+			objective = np.multiply( R0_tvar, R0_tstat )[:, :, 0:n_dates_tr-ds_crt].flatten(order='F')
+			objective = np.multiply( np.log( objective ), y_tr) - objective;
+			
+			#new_weight_pre = ( COV_tvar_X_t[tr_st:tr_ed] - each_t )/bw;
+			#new_weight = np.exp( -(new_weight_pre ** 2)/2 )/(np.sqrt(2*np.pi))/bw 
+			#new_weight = np.multiply( smpl_wgt[tr_st:tr_ed], new_weight)
+			#objective  = objective * new_weight
+			
+			grad = (new_weight_pre ** 2 + 1) * new_weight / bw;
+			
+			objective  = ( objective[tr_st:tr_ed] * new_weight ).sum()
+			grad = grad.sum()
+			
+			q_PR.put( (each_t, coef_tvar, coef_tstat, R0_tvar_est, R0_tstat_est, objective, grad) )
 		
 		else:
 			#print("arr_states[proc_id]: ", arr_states[proc_id])
 			time.sleep(0.1)
+
+# ------ Use Adam ---------- #
+
+# objective function and derivative
+def obj_grad( bw, R0_tvar, R0_tstat, y_tr, smpl_wgt, \
+			  n_hzone, n_dates_tr, ds_crt):
 	
+	objective = np.multiply( R0_tvar, R0_tstat )[:, :, 0:n_dates_tr-ds_crt].flatten(order='F')
+	objective = np.multiply( np.log( objective ), y_tr) - objective;
+	objective = np.multiply( objective, smpl_wgt )
+	objective = np.reshape(objective, [n_hzone, n_hzone , (n_dates_tr-ds_crt)], order='F')
+	objective = np.expand_dims( objective.sum(0).sum(0), axis=1)
+	
+	pdb.set_trace()
+	delta_t_in = np.expand_dims( range(0, n_dates_tr-ds_crt), axis=0 ) - \
+				 np.expand_dims( range(0, n_dates_tr-ds_crt), axis=1 );
+	delta_t_in = ( delta_t_in/bw ) ** 2;
+	
+	delta_t = np.exp( -delta_t_in/2 ) / (np.sqrt(2*np.pi)*bw) 
+	
+	# Objective 
+	obj  = np.multiply( objective, delta_t ).sum()
+	grad = np.multiply( objective, delta_t / bw * ( delta_t_in - 1 ) ).sum()
+	
+	return obj, grad
+
+# gradient descent algorithm with adam
+def Update_BW_adam( bw, COV_tvar_Xall, COV_tvar_X_t, COV_tstat_X,\
+          y_tr, R0_tvar, R0_tstat, \
+          smpl_wgt, n_hzone, n_dates_tr, ds_crt ):
+	
+	#(objective, derivative, bounds, n_iter, alpha, beta1, beta2, eps=1e-8):
+	bw= bw
+	# ---- Parameters For Adam  ---- #
+	eps = 1e-8
+	
+	# define the total iterations
+	n_iter = 1000
+	# steps size
+	alpha = 10
+	# factor for average gradient
+	beta1 = 0.8
+	# factor for average squared gradient
+	beta2 = 0.999
+
+	# generate an initial point
+	obj, grad = obj_grad( bw, R0_tvar, R0_tstat, y_tr, smpl_wgt, \
+             	 	  n_hzone, n_dates_tr, ds_crt)
+	
+	# initialize first and second moments
+	m = 10;
+	v = 10;
+	
+	# run the gradient descent updates
+	for t in range(n_iter):
+		
+		m = beta1 * m + (1.0 - beta1) * grad
+		v = beta2 * v + (1.0 - beta2) * grad
+		
+		mhat = m / (1.0 - beta1**(t+1))
+		vhat = v / (1.0 - beta2**(t+1))
+		
+		bw = bw + alpha * mhat / (np.sqrt(vhat) + eps)
+		
+		# evaluate candidate point
+		obj, grad = obj_grad( bw, R0_tvar, R0_tstat, y_tr, smpl_wgt, \
+					n_hzone, n_dates_tr, ds_crt)		
+		
+		# report progress
+		print('>%d f(%s) = %.5f, grad = %0.5f, vhat= %0.5f' % (t, bw, obj, grad, vhat))
+	
+	pdb.set_trace()
+	return bw
+	
+			
 def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat_tstat, n_hzone, \
 				 covids, covids_te, COV_name,\
 				 COV_tvar_Xall, COV_tvar_X, COV_tvar_te, \
@@ -423,6 +512,11 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 		# Update Global variables
 		y_tr = P_j[:, :, 0:n_dates_tr - ds_crt].numpy().flatten(order='F')
 	
+		# ----- Estimate Update Bandwidth ----- #
+		bw_est = Update_BW_adam( bw, COV_tvar_Xall, COV_tvar_X_t, COV_tstat_X,\
+              					 y_tr, R0_tvar, R0_tstat, \
+								 smpl_wgt, n_hzone, n_dates_tr, ds_crt )
+		
 		# ------------------------------------- #
 		
 		for each_proc in range(0, n_proc):
@@ -444,33 +538,32 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 			q_job.put(each_t)
 		
 		for each_q in tqdm(s_processes):
-			each_t, coef_tvar, coef_tstat, r0_tvar, r0_tstat = q_PR.get()
+			each_t, coef_tvar, coef_tstat, r0_tvar, r0_tstat, objective, grad = q_PR.get()
 			tolcoef_tvar_est[:, each_t]  = coef_tvar
 			tolcoef_tstat_est[:, each_t] = coef_tstat
 			#
 			R0_tvar_est[ each_t * n_hzone * n_hzone: (each_t + 1) * n_hzone * n_hzone, ]  = r0_tvar
 			R0_tstat_est[each_t * n_hzone * n_hzone: (each_t + 1) * n_hzone * n_hzone, ] = r0_tstat
+			#
+			bw_obj[ each_t, ]  = objective
+			bw_grad[ each_t, ] = grad
 		
 		R0_est = R0_tvar_est * R0_tstat_est;
 
 		# ----- Estimate Update Alpha Beta ----- #
-		if bool_wbl:
-			indx = np.tril_indices(n_dates_tr - ds_crt, -1) 
-			obs = indx[0] - indx[1]
-			weight_wbl = weight_wbl.numpy()[indx[0], indx[1]]
-			
-			obs_weight = pd.DataFrame( np.vstack((obs, weight_wbl)).T, \
-						columns=['obs','weight_wbl']).groupby('obs').sum().reset_index()
-			obs_weight['weight_wbl'] = obs_weight['weight_wbl']/obs_weight['weight_wbl'].sum()
-			
-			#print(np.unique( np.random.choice(obs_weight['obs'], 100000, p=obs_weight['weight_wbl']) ))
-			wel_est = weibull_min.fit( np.random.choice(obs_weight['obs'], 100000, p=obs_weight['weight_wbl']), floc=0 )
-			
-			alpha_shape_est = wel_est[0]
-			beta_scale_est = wel_est[2]
-		else:
-			alpha_shape_est = copy.deepcopy(alpha_shape)
-			beta_scale_est  = copy.deepcopy(beta_scale)
+		indx = np.tril_indices(n_dates_tr - ds_crt, -1) 
+		obs = indx[0] - indx[1]
+		weight_wbl = weight_wbl.numpy()[indx[0], indx[1]]
+		
+		obs_weight = pd.DataFrame( np.vstack((obs, weight_wbl)).T, columns=['obs','weight_wbl']).groupby('obs').sum().reset_index()
+		obs_weight['weight_wbl'] = obs_weight['weight_wbl']/obs_weight['weight_wbl'].sum()
+		
+		#print(np.unique( np.random.choice(obs_weight['obs'], 100000, p=obs_weight['weight_wbl']) ))
+		wel_est = weibull_min.fit( np.random.choice(obs_weight['obs'], 100000, p=obs_weight['weight_wbl']), floc=0 )
+		
+		alpha_shape_est = wel_est[0]
+		beta_scale_est = wel_est[2]
+		
 		
 		# Reshape mus, R0, (alpha_shape, beta_scale)
 		R0_est = np.reshape( R0_est, [n_hzone,n_hzone,n_dates],order='F' )
@@ -505,7 +598,6 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 		print("Itr: ", "{:04d}".format(itr_em), \
 			  ", mus_mean: ", "{:6f}".format(mus.mean()), \
 			  ", mus_diff: ", "{:6e}".format(dict_delta['delta_mu'][-1]), \
-			  ", wbl_diff: ", "{:6e}".format(dict_delta['delta_wbl'][-1]), \
 			  ", R0_mean: ", "{:.8f}".format(R0.mean()), \
 			  ", delta_tolcoef_tvar: ", "{:.6e}".format(dict_delta['delta_tolcoef_tvar'][-1]), \
 			  ", delta_tolcoef_tstat: ", "{:.6e}".format(dict_delta['delta_tolcoef_tstat'][-1]), \
@@ -513,10 +605,9 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 			  ", alpha_shape: ", "{:.3e}".format(alpha_shape), ", beta_scale: ", "{:.3e}".format(beta_scale))
 		#----- Early Stop -------#
 		if itr_em > 3:
-			if (   np.all( np.array( dict_delta['delta_tolcoef_tvar'][-3:]) < tol         ) \
-				 & np.all( np.array(dict_delta['delta_tolcoef_tstat'][-3:]) < tol         ) \
-				 & np.all( np.array(           dict_delta['delta_mu'][-3:]) < tol         ) \
-				 & np.all( np.array(          dict_delta['delta_wbl'][-3:]) < 10**-1      )):
+			if (   np.all( np.array( dict_delta['delta_tolcoef_tvar'][-3:]) < tol ) \
+				 & np.all( np.array(dict_delta['delta_tolcoef_tstat'][-3:]) < tol ) \
+				 & np.all( np.array(           dict_delta['delta_mu'][-3:]) < tol )):
 				
 				for proc_id in range(0, n_proc):
 					arr_states[proc_id] = 0
@@ -550,9 +641,9 @@ def arg_parse():
 	parser = argparse.ArgumentParser()
 	#
 	parser.add_argument("--ds_crt", type=int, help="Days for boundary correction", default=14)
-	parser.add_argument("--tol", type=float, help="Tolerance for convergence", default=10**-3)
-	parser.add_argument("--max_itr", type=int, help="# of maximum iterations", default=100)
-	parser.add_argument("--n_proc", type=str, help="Number of processes", default=45)
+	parser.add_argument("--tol", type=float, help="Tolerance for convergence", default=5*10**-4)
+	parser.add_argument("--max_itr", type=int, help="# of maximum iterations", default=60)
+	parser.add_argument("--n_proc", type=str, help="Number of processes", default=30)
 	#
 	parser.add_argument("--st_date", type=str, help="Prediction start date", default='2020-10-04')
 	parser.add_argument("--d_pred_ahead", type=int, help="Number of days ahead for prediction", default=28)
@@ -561,22 +652,13 @@ def arg_parse():
 	parser.add_argument("--case_type", type=str, help="# of maximum iterations", default='confirm')
 	parser.add_argument("--bw",			 type=float, help="bandwidth for the kernel", default=1) #[50 1] 
 	parser.add_argument("--d_pr",          type=float, help="days used for regression", default=30) #[30 60]
-	parser.add_argument("--alpha_shape", type=float, help="Shape parameters for wbl", default= 2)
-	parser.add_argument("--beta_scale",  type=float, help="bandwidth for the kernel", default=10)
+	parser.add_argument("--alpha_shape", type=float, help="Shape parameters for wbl", default=14)
+	parser.add_argument("--beta_scale",  type=float, help="bandwidth for the kernel", default=5)
 	args = parser.parse_args()
 	
 	# Assign to global
 	dict_parser = [ ( each, getattr(args, each) ) for each in args.__dict__.keys() ]
-	dict_parser = dict(dict_parser)
-	globals().update( dict_parser )
-	
-	global bool_wbl, alpha_shape, beta_scale
-	if (( dict_parser['alpha_shape']==0) & (dict_parser['beta_scale']==0)):
-		bool_wbl = True;
-		# Set initial
-		alpha_shape = 2; beta_scale=10; 
-	else:
-		bool_wbl = False;
+	globals().update( dict(dict_parser) )
 	
 	# Print out all arguments
 	print(' '.join(f'{k}={v}' for k, v in vars(args).items()))

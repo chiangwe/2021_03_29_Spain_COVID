@@ -40,7 +40,7 @@ import pdb
 print("python_version: ", python_version())
 
 # Force to use CUP since I don't have access
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 if tf.test.gpu_device_name():
 	print('GPU found')
