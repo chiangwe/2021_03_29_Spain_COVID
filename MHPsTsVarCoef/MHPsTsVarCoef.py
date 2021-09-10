@@ -557,6 +557,9 @@ def arg_parse():
 	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
 	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
 	#
+	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
+	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
+	#
 	parser.add_argument("--mdl_name", 		type=str,	help="# of maximum iterations", default='MHPsTsVarCoef')
 	parser.add_argument("--case_type", 		type=str,	help="# of maximum iterations", default='confirm')
 	parser.add_argument("--bw",			 	type=float, help="bandwidth for the kernel", default=1) #[50 1] 
