@@ -48,13 +48,14 @@ else:
 	print("No Available GPU")
 
 # Force to use CUP since I don't have access
-# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
-if tf.test.gpu_device_name():
-	print('GPU found')
-else:
-	print("No GPU found")
-
+print("TEMP")
+#if tf.test.gpu_device_name():
+#	print('GPU found')
+#else:
+#	print("No GPU found")
+#
 #from sklearnex import patch_sklearn
 #patch_sklearn()
 
@@ -549,24 +550,20 @@ def arg_parse():
 	# Parse the passed in parameters
 	parser = argparse.ArgumentParser()
 	#
-	parser.add_argument("--ds_crt", 		type=int,	help="Days for boundary correction", default=14)
-	parser.add_argument("--tol", 			type=float,	help="Tolerance for convergence", default=10**-3)
-	parser.add_argument("--max_itr", 		type=int,	help="# of maximum iterations", default=100)
-	parser.add_argument("--n_proc", 		type=str,	help="Number of processes", default=45)
+	parser.add_argument("--ds_crt", type=int, help="Days for boundary correction", default=14)
+	parser.add_argument("--tol", type=float, help="Tolerance for convergence", default=10**-3)
+	parser.add_argument("--max_itr", type=int, help="# of maximum iterations", default=100)
+	parser.add_argument("--n_proc", type=str, help="Number of processes", default=15)
 	#
-	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
-	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
+	parser.add_argument("--st_date", type=str, help="Prediction start date", default='2020-10-04')
+	parser.add_argument("--d_pred_ahead", type=int, help="Number of days ahead for prediction", default=28)
 	#
-	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
-	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
-	#
-	parser.add_argument("--mdl_name", 		type=str,	help="# of maximum iterations", default='MHPsTsVarCoef')
-	parser.add_argument("--case_type", 		type=str,	help="# of maximum iterations", default='confirm')
-	parser.add_argument("--bw",			 	type=float, help="bandwidth for the kernel", default=1) #[50 1] 
-	parser.add_argument("--d_pr",          	type=float, help="days used for regression", default=30) #[30 60]
-	parser.add_argument("--pd_date",		type=str, help="start date for prediction", default=30)
-	parser.add_argument("--alpha_shape", 	type=float, help="Shape parameters for wbl", default= 2)
-	parser.add_argument("--beta_scale",  	type=float, help="bandwidth for the kernel", default=10)
+	parser.add_argument("--mdl_name", type=str, help="# of maximum iterations", default='MHPsTsVarCoef')
+	parser.add_argument("--case_type", type=str, help="# of maximum iterations", default='confirm')
+	parser.add_argument("--bw",			 type=float, help="bandwidth for the kernel", default=1) #[50 1] 
+	parser.add_argument("--d_pr",          type=float, help="days used for regression", default=30) #[30 60]
+	parser.add_argument("--alpha_shape", type=float, help="Shape parameters for wbl", default= 2)
+	parser.add_argument("--beta_scale",  type=float, help="bandwidth for the kernel", default=10)
 	args = parser.parse_args()
 	
 	# Assign to global
@@ -606,34 +603,22 @@ def main():
 	q_data = multiprocessing.Queue()
 	arr_states = multiprocessing.Array('i', [0]*n_proc )
 	
-	ls_proc = [];
 	for each_proc in range(0, n_proc):
 		p = multiprocessing.Process(target=PR_fit_tvar, args=( q_PR, q_job, q_data, arr_states, each_proc ))
 		p.start()
-		ls_proc.append(p)
 	
 	# Load The raw data 
 	df_infect, df_death, df_demo, ls_arr_move, ls_date_move, ls_hzone_code_move, date_ranges = \
 		raw_data_load( path_demo, path_infect, path_death, path_movement )
 	
 	# Loop over each prediction start date 
-	each_date = pd.to_datetime( pd_date )
-	
-	# Over write the data range since we are doing one a a time 
-	date_ranges = [each_date]
-	
 	for each_date in tqdm(date_ranges):
 		
 		# ----- Set initial parameters -----#
-		if bool_wbl == True:
-			para_str = 	'type_' + case_type + '_bw_' + str(int(bw)) + \
-						'_alpha_' + str(0) + '_beta_' + \
-						str(0) + '_predat_';
-		else:
-			para_str = 	'type_' + case_type + '_bw_' + str(int(bw)) + \
-						'_alpha_' + str(int(alpha_shape)) + '_beta_' + \
-						str(int(beta_scale)) + '_predat_';
-			
+		para_str = 	'type_' + case_type + '_bw_' + str(int(bw)) + \
+					'_alpha_' + str(int(alpha_shape)) + '_beta_' + \
+					str(int(beta_scale)) + '_predat_';
+		
 		#
 		mdl_path_save = './mdl/' + mdl_name + '/' + mdl_name + \
 						'_Spain_' + para_str + each_date.strftime("%Y-%m-%d") + '.mat';
@@ -660,14 +645,13 @@ def main():
 				 COV_tstat_X, COV_tstat_te, smpl_wgt, alpha_shape, beta_scale \
 				)
 		
-		# print("Done: ")
-		# for proc_id in range(0, n_proc):
+		#print("Done: ")
+		#for proc_id in range(0, n_proc):
 		#	arr_states[proc_id] = 0
 	
-	#for proc_id in range(0, n_proc):
-	#	arr_states[proc_id] = 4
-	for each_p in ls_proc:
-		each_p.terminate()
+	for proc_id in range(0, n_proc):
+		arr_states[proc_id] = 4
+	
 	
 if __name__ == "__main__":
 	main()

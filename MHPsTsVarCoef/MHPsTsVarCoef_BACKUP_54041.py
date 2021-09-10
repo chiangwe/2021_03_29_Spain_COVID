@@ -48,13 +48,14 @@ else:
 	print("No Available GPU")
 
 # Force to use CUP since I don't have access
-# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
-if tf.test.gpu_device_name():
-	print('GPU found')
-else:
-	print("No GPU found")
-
+print("TEMP")
+#if tf.test.gpu_device_name():
+#	print('GPU found')
+#else:
+#	print("No GPU found")
+#
 #from sklearnex import patch_sklearn
 #patch_sklearn()
 
@@ -549,13 +550,17 @@ def arg_parse():
 	# Parse the passed in parameters
 	parser = argparse.ArgumentParser()
 	#
+<<<<<<< HEAD
+	parser.add_argument("--ds_crt", type=int, help="Days for boundary correction", default=14)
+	parser.add_argument("--tol", type=float, help="Tolerance for convergence", default=10**-3)
+	parser.add_argument("--max_itr", type=int, help="# of maximum iterations", default=100)
+	parser.add_argument("--n_proc", type=str, help="Number of processes", default=15)
+=======
 	parser.add_argument("--ds_crt", 		type=int,	help="Days for boundary correction", default=14)
 	parser.add_argument("--tol", 			type=float,	help="Tolerance for convergence", default=10**-3)
 	parser.add_argument("--max_itr", 		type=int,	help="# of maximum iterations", default=100)
 	parser.add_argument("--n_proc", 		type=str,	help="Number of processes", default=45)
-	#
-	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
-	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
+>>>>>>> 7bbd29c8418b6dd641ac41fb1267254ed6314171
 	#
 	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
 	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
