@@ -1,0 +1,1 @@
+python MHPsTsVarCoef.py --case_type death --pd_date 2021-01-31 --bw 5 --alpha_shape 0 --beta_scale 0 >/dev/null

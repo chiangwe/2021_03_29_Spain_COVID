@@ -1,0 +1,1 @@
+python MHPsTsVarCoef.py --case_type confirm --pd_date 2021-01-17 --bw 10 --alpha_shape 0 --beta_scale 0 >/dev/null

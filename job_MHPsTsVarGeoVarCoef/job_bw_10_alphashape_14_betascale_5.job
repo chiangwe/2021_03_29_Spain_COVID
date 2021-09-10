@@ -1,0 +1,1 @@
+python MHPsTsVarGeoVarCoef.py --bw 10 --alpha_shape 14 --beta_scale 5 >/dev/null

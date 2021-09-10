@@ -1,0 +1,1 @@
+python MHPsPRs.py --case_type death --alpha_shape 14 --beta_scale 5 >/dev/null
