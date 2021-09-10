@@ -1,0 +1,95 @@
+2021-05-14 12:29:23.955314: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-14 12:29:25.581920: I tensorflow/core/platform/cpu_feature_guard.cc:142] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 AVX512F FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2021-05-14 12:29:25.589425: I tensorflow/compiler/jit/xla_gpu_device.cc:99] Not creating XLA devices, tf_xla_enable_xla_devices not set
+2021-05-14 12:29:25.591385: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcuda.so.1
+2021-05-14 12:29:26.748924: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1720] Found device 0 with properties: 
+pciBusID: 0000:3b:00.0 name: Tesla V100-PCIE-16GB computeCapability: 7.0
+coreClock: 1.38GHz coreCount: 80 deviceMemorySize: 15.78GiB deviceMemoryBandwidth: 836.37GiB/s
+2021-05-14 12:29:26.749797: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1720] Found device 1 with properties: 
+pciBusID: 0000:d8:00.0 name: Tesla V100-PCIE-16GB computeCapability: 7.0
+coreClock: 1.38GHz coreCount: 80 deviceMemorySize: 15.78GiB deviceMemoryBandwidth: 836.37GiB/s
+2021-05-14 12:29:26.749842: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-14 12:29:26.753408: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-14 12:29:26.753525: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublasLt.so.11
+2021-05-14 12:29:26.754709: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-14 12:29:26.755106: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-14 12:29:26.757126: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.10
+2021-05-14 12:29:26.757963: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-14 12:29:26.758304: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-14 12:29:26.761488: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1862] Adding visible gpu devices: 0, 1
+2021-05-14 12:29:26.761532: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-14 12:29:27.794360: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1261] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-14 12:29:27.794414: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1267]      0 1 
+2021-05-14 12:29:27.794422: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1280] 0:   N Y 
+2021-05-14 12:29:27.794426: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1280] 1:   Y N 
+2021-05-14 12:29:27.798166: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1406] Created TensorFlow device (/device:GPU:0 with 14759 MB memory) -> physical GPU (device: 0, name: Tesla V100-PCIE-16GB, pci bus id: 0000:3b:00.0, compute capability: 7.0)
+2021-05-14 12:29:27.799782: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1406] Created TensorFlow device (/device:GPU:1 with 12274 MB memory) -> physical GPU (device: 1, name: Tesla V100-PCIE-16GB, pci bus id: 0000:d8:00.0, compute capability: 7.0)
+dispatcher.py:151: FutureWarning: 
+Scikit-learn patching with daal4py is deprecated and will be removed in the future.
+Use Intel(R) Extension for Scikit-learn* module instead (pip install scikit-learn-intelex).
+To enable patching, please use one of the following options:
+1) From the command line:
+    python -m sklearnex <your_script>
+2) From your script:
+    from sklearnex import patch_sklearn
+    patch_sklearn()
+Intel(R) oneAPI Data Analytics Library solvers for sklearn enabled: https://intelpython.github.io/daal4py/sklearn.html
+  0%|          | 0/30 [00:00<?, ?it/s] 27%|██▋       | 8/30 [00:06<00:19,  1.15it/s]
+This script is running on server : /home/chiangwe/anaconda3/envs/NetHawkes/bin/python
+python_version:  3.6.13
+GPU found
+./mdl/MHPsTsVarCoef/MHPsTsVarCoef_Spain_type_confirm_bw_100_alpha_14_beta_5_predat_2020-10-04.mat
+./mdl/MHPsTsVarCoef/MHPsTsVarCoef_Spain_type_confirm_bw_100_alpha_14_beta_5_predat_2020-10-11.mat
+./mdl/MHPsTsVarCoef/MHPsTsVarCoef_Spain_type_confirm_bw_100_alpha_14_beta_5_predat_2020-10-18.mat
+./mdl/MHPsTsVarCoef/MHPsTsVarCoef_Spain_type_confirm_bw_100_alpha_14_beta_5_predat_2020-10-25.mat
+./mdl/MHPsTsVarCoef/MHPsTsVarCoef_Spain_type_confirm_bw_100_alpha_14_beta_5_predat_2020-11-01.mat
+./mdl/MHPsTsVarCoef/MHPsTsVarCoef_Spain_type_confirm_bw_100_alpha_14_beta_5_predat_2020-11-08.mat
+./mdl/MHPsTsVarCoef/MHPsTsVarCoef_Spain_type_confirm_bw_100_alpha_14_beta_5_predat_2020-11-15.mat
+./mdl/MHPsTsVarCoef/MHPsTsVarCoef_Spain_type_confirm_bw_100_alpha_14_beta_5_predat_2020-11-22.mat
+./mdl/MHPsTsVarCoef/MHPsTsVarCoef_Spain_type_confirm_bw_100_alpha_14_beta_5_predat_2020-11-29.mat
+Traceback (most recent call last):
+  File "MHPsTsVarCoef.py", line 198, in <module>
+    COV_X_std = np.expand_dims(COV_X.std(0), axis=0);
+  File "/home/chiangwe/anaconda3/envs/NetHawkes/lib/python3.6/site-packages/numpy/core/_methods.py", line 234, in _std
+    keepdims=keepdims)
+  File "/home/chiangwe/anaconda3/envs/NetHawkes/lib/python3.6/site-packages/numpy/core/_methods.py", line 205, in _var
+    x = um.multiply(x, x, out=x)
+KeyboardInterrupt
+2021-05-19 14:55:34.595500: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcudart.so.11.0
+2021-05-19 14:55:35.659816: I tensorflow/core/platform/cpu_feature_guard.cc:142] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 AVX512F FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2021-05-19 14:55:35.669928: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcuda.so.1
+2021-05-19 14:55:37.465977: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1733] Found device 0 with properties: 
+pciBusID: 0000:3b:00.0 name: Tesla V100-PCIE-16GB computeCapability: 7.0
+coreClock: 1.38GHz coreCount: 80 deviceMemorySize: 15.78GiB deviceMemoryBandwidth: 836.37GiB/s
+2021-05-19 14:55:37.466586: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1733] Found device 1 with properties: 
+pciBusID: 0000:d8:00.0 name: Tesla V100-PCIE-16GB computeCapability: 7.0
+coreClock: 1.38GHz coreCount: 80 deviceMemorySize: 15.78GiB deviceMemoryBandwidth: 836.37GiB/s
+2021-05-19 14:55:37.466619: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcudart.so.11.0
+2021-05-19 14:55:37.469336: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcublas.so.11
+2021-05-19 14:55:37.469417: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcublasLt.so.11
+2021-05-19 14:55:37.470259: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcufft.so.10
+2021-05-19 14:55:37.470540: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcurand.so.10
+2021-05-19 14:55:37.471263: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcusolver.so.11
+2021-05-19 14:55:37.471851: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcusparse.so.11
+2021-05-19 14:55:37.472090: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcudnn.so.8
+2021-05-19 14:55:37.474291: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1871] Adding visible gpu devices: 0, 1
+2021-05-19 14:55:37.474340: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcudart.so.11.0
+2021-05-19 14:55:38.259637: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1258] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-19 14:55:38.259681: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1264]      0 1 
+2021-05-19 14:55:38.259688: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1277] 0:   N Y 
+2021-05-19 14:55:38.259692: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1277] 1:   Y N 
+2021-05-19 14:55:38.262635: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1418] Created TensorFlow device (/device:GPU:0 with 14643 MB memory) -> physical GPU (device: 0, name: Tesla V100-PCIE-16GB, pci bus id: 0000:3b:00.0, compute capability: 7.0)
+2021-05-19 14:55:38.263742: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1418] Created TensorFlow device (/device:GPU:1 with 14643 MB memory) -> physical GPU (device: 1, name: Tesla V100-PCIE-16GB, pci bus id: 0000:d8:00.0, compute capability: 7.0)
+dispatcher.py:151: FutureWarning: 
+Scikit-learn patching with daal4py is deprecated and will be removed in the future.
+Use Intel(R) Extension for Scikit-learn* module instead (pip install scikit-learn-intelex).
+To enable patching, please use one of the following options:
+1) From the command line:
+    python -m sklearnex <your_script>
+2) From your script:
+    from sklearnex import patch_sklearn
+    patch_sklearn()
+Intel(R) oneAPI Data Analytics Library solvers for sklearn enabled: https://intelpython.github.io/daal4py/sklearn.html
+  0%|          | 0/30 [00:00<?, ?it/s]
