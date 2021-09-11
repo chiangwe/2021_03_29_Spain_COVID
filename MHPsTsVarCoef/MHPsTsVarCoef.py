@@ -43,7 +43,7 @@ import pdb
 global myhost
 myhost = os.uname()[1]
 
-if ( ( myhost == 'volta') | ( myhost == 'gibson.science.iupui.edu' ) ):
+if ( ( myhost == 'volta') ):
 	list_avail_gpu = [ each for each in nvsmi.get_available_gpus()]
 
 	if len(list_avail_gpu) > 0:
@@ -591,7 +591,8 @@ def arg_parse():
 	print(' '.join(f'{k}={v}' for k, v in vars(args).items()))
 	
 	# Fixing the number of the processes 
-
+	myhost = os.uname()[1]
+	
 	if ( myhost == 'volta'):
 		n_proc = 30
 	elif ( myhost == 'gibson.science.iupui.edu' ):
