@@ -39,21 +39,29 @@ import multiprocessing
 import queue
 import pdb
 
-list_avail_gpu = [ each for each in nvsmi.get_available_gpus()]
+# ---- Find the host name ----- # 
+global myhost
+myhost = os.uname()[1]
 
-if len(list_avail_gpu) > 0:
-	list_avail_gpu[0]
-	os.environ['CUDA_VISIBLE_DEVICES'] = list_avail_gpu[0].id
-else:
-	print("No Available GPU")
+if ( ( myhost == 'volta') | ( myhost == 'gibson.science.iupui.edu' ) ):
+	list_avail_gpu = [ each for each in nvsmi.get_available_gpus()]
 
-# Force to use CUP since I don't have access
-# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+	if len(list_avail_gpu) > 0:
+		list_avail_gpu[0]
+		os.environ['CUDA_VISIBLE_DEVICES'] = list_avail_gpu[0].id
+	else:
+		print("No Available GPU")
 
-if tf.test.gpu_device_name():
-	print('GPU found')
+	# Force to use CUP since I don't have access
+	# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+	if tf.test.gpu_device_name():
+		print('GPU found')
+	else:
+		print("No GPU found")
 else:
 	print("No GPU found")
+	os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 #from sklearnex import patch_sklearn
 #patch_sklearn()
@@ -552,10 +560,7 @@ def arg_parse():
 	parser.add_argument("--ds_crt", 		type=int,	help="Days for boundary correction", default=14)
 	parser.add_argument("--tol", 			type=float,	help="Tolerance for convergence", default=10**-3)
 	parser.add_argument("--max_itr", 		type=int,	help="# of maximum iterations", default=100)
-	parser.add_argument("--n_proc", 		type=str,	help="Number of processes", default=45)
-	#
-	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
-	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
+	parser.add_argument("--n_proc", 		type=str,	help="Number of processes", default=10)
 	#
 	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
 	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
@@ -585,6 +590,15 @@ def arg_parse():
 	# Print out all arguments
 	print(' '.join(f'{k}={v}' for k, v in vars(args).items()))
 	
+	# Fixing the number of the processes 
+
+	if ( myhost == 'volta'):
+		n_proc = 30
+	elif ( myhost == 'gibson.science.iupui.edu' )
+		n_proc = 30
+	else:
+		n_proc = 10
+
 def main():
 	
 	# Parse the auguments 
