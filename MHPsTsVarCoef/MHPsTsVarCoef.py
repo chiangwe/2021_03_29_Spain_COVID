@@ -560,7 +560,7 @@ def arg_parse():
 	parser.add_argument("--ds_crt", 		type=int,	help="Days for boundary correction", default=14)
 	parser.add_argument("--tol", 			type=float,	help="Tolerance for convergence", default=10**-3)
 	parser.add_argument("--max_itr", 		type=int,	help="# of maximum iterations", default=100)
-	parser.add_argument("--n_proc", 		type=str,	help="Number of processes", default=10)
+	parser.add_argument("--n_proc", 		type=str,	help="Number of processes", default=7)
 	#
 	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
 	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
@@ -597,7 +597,7 @@ def arg_parse():
 	elif ( myhost == 'gibson.science.iupui.edu' ):
 		n_proc = 30
 	else:
-		n_proc = 10
+		n_proc = 5
 
 def main():
 	
