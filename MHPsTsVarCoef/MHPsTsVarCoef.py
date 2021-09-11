@@ -594,7 +594,7 @@ def arg_parse():
 
 	if ( myhost == 'volta'):
 		n_proc = 30
-	elif ( myhost == 'gibson.science.iupui.edu' )
+	elif ( myhost == 'gibson.science.iupui.edu' ):
 		n_proc = 30
 	else:
 		n_proc = 10
