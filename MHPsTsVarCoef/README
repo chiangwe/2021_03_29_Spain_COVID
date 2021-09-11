@@ -1,0 +1,3 @@
+perl ./Drone.pl ./job_volta/ ./lock_volta/ > ./error.text &
+perl ./Drone.pl ./job_gibson/ ./lock_gibson/ > ./error.text &
+perl ./Drone.pl ./job_weather/ ./lock_weather/ > ./error.text &
