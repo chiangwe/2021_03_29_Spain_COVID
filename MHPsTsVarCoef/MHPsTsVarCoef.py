@@ -593,13 +593,14 @@ def arg_parse():
 	# Fixing the number of the processes 
 	myhost = os.uname()[1]
 	
+	global n_proc
 	if ( myhost == 'volta'):
 		n_proc = 30
 	elif ( myhost == 'gibson.science.iupui.edu' ):
 		n_proc = 30
 	else:
 		n_proc = 5
-
+	
 def main():
 	
 	# Parse the auguments 
