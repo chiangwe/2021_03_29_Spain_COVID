@@ -10,3 +10,4 @@
 !*.job
 !*.lock
 !*.out
+!*.yml
