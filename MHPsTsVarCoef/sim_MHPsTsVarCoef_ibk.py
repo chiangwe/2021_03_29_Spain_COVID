@@ -93,9 +93,6 @@ def off_sim( q_sim, q_job):
         row = [each[0] for each in dict_cnt_keys]
         col = [each[1] for each in dict_cnt_keys]
 
-        #output_cnt[:, :, itr_sim] = output_cnt[:, :, itr_sim] + csr_matrix((data, (row, col)),
-        #                                                                   shape=(n_hzone, d_pred)).toarray();
-
         out_sparse = csr_matrix((data, (row, col)), shape=(n_hzone, d_pred));
 
         q_sim.put( (itr_sim, out_sparse) )
@@ -133,9 +130,9 @@ if __name__ == '__main__':
 
     ls_p = [];
     for each_proc in range(0, n_proc):
-        p = multiprocessing.Process(target=off_sim, args=(q_sim, q_job))
-        p.start()
-        ls_p.append(p)
+		p = multiprocessing.Process(target=off_sim, args=(q_sim, q_job))
+		p.start()
+		ls_p.append(p)
 
     #%% ----- Read Data-----#
     df_raw = pd.read_csv('../../Raw_Dataset/Castilla/01March_2020_27April_2021_CYL_Combined.csv');

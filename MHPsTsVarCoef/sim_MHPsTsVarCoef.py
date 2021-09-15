@@ -26,16 +26,18 @@ import copy
 from tqdm import tqdm
 from sklearn import linear_model
 import shelve
-from scipy.io import savemat
+from scipy.io import savemat, loadmat
 #from set_size import set_size
 #import rpy2
 import pickle
 import time
 from platform import python_version
 print("python_version: ", python_version())
+from collections import Counter
 import nvsmi
 
 import multiprocessing
+from scipy.sparse import csr_matrix
 import queue
 import pdb
 
@@ -189,28 +191,76 @@ def data_eng( pred_st, df_infect, df_death, df_demo, ls_arr_move, ls_date_move, 
 		   covids, covids_te, COV_name, \
 		   COV_tvar_Xall, COV_tvar_X, COV_tvar_te, \
 		   COV_tstat_X, COV_tstat_te, smpl_wgt
-		
+
+def off_sim( q_sim, q_job):
+
+	while(True):
+	
+	    itr_sim, itr_pred, r_0s, cnts, dict_para = q_job.get()
+	    np.random.seed(itr_sim)
+	
+	    n_hzone = dict_para['n_hzone']
+	    offspring = [np.random.poisson(r_0, int(cnt)).sum() for r_0, cnt in zip(r_0s, cnts)];
+	
+	    offspring = np.reshape(offspring, [n_hzone, n_hzone]).sum(1);
+	
+	    ts_offsprint = [
+	        np.round(np.random.weibull(alpha_shape, offspring[itr_zone]) * beta_scale) + itr_pred \
+	        for itr_zone in range(0, n_hzone) ];
+	
+	    itr_zones = [ [itr_zone] * len(ts_offsprint[itr_zone]) \
+	                 for itr_zone in range(0, n_hzone)];
+	
+	    ts_offsprint = np.hstack(ts_offsprint)
+	    itr_zones = np.hstack(itr_zones)
+	
+	    ts_offsprint = [(itrzone, ts) for itrzone, ts in zip(itr_zones, ts_offsprint) if ts < d_pred_ahead];
+	
+	    dict_cnt = Counter(ts_offsprint);
+	    dict_cnt_keys = list(dict_cnt.keys())
+	
+	    data = [dict_cnt[each] for each in dict_cnt_keys]
+	    row = [each[0] for each in dict_cnt_keys]
+	    col = [each[1] for each in dict_cnt_keys]
+	
+	    out_sparse = csr_matrix((data, (row, col)), shape=(n_hzone, d_pred_ahead));
+	
+	    q_sim.put( (itr_sim, out_sparse) )
+	
 def event_sim( mdl_path_save, sim_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat_tstat, n_hzone, \
 				 covids, covids_te, COV_name,\
 				 COV_tvar_Xall, COV_tvar_X, COV_tvar_te, \
-				 COV_tstat_X, COV_tstat_te, smpl_wgt, alpha_shape, beta_scale ):
+				 COV_tstat_X, COV_tstat_te, mdic ):
 	
-	pdb.set_trace()
+	q_job = multiprocessing.Queue();
+	q_sim = multiprocessing.Queue();
+	
+	ls_proc = [];
+	for each_proc in range(0, n_proc):
+		p = multiprocessing.Process(target=off_sim, args=(q_sim, q_job))
+		p.start()
+		ls_proc.append(p)
+	
 	# ================================ Work on Simulation ================================#
+	global d_pred_ahead
 	
 	# Initial intermediate
 	sim_dates = n_dates_tr + n_dates_te;
 	
-	# == Get R0 first ==#
+	if n_dates_tr + d_pred_ahead > sim_dates:
+		d_pred_ahead = int(n_dates_te/7)*7
+		
+	# == Get alpha beta == #
+	alpha_shape = mdic['alpha_shape'];
+	beta_scale = mdic['beta_scale'];
 	
-	R0_est = np.zeros((n_hzone , n_hzone , sim_dates ));
-	for each_d in range(0, sim_dates ):
-		feat = COV[ n_hzone * n_hzone* each_d : (n_hzone * n_hzone* (each_d+1)), : ]
-		r0_temp = np.exp(np.matmul(np.hstack((np.ones((feat.shape[0], 1)), feat)), mdic['tolcoef'][:, each_d] ))
-		R0_est[:, :, each_d] = np.reshape(r0_temp, [n_hzone, n_hzone], order='F')
+	# == Get R0 first ==#
+	R0_est  = mdic['R0']
 	
 	R0_est[R0_est>1] = 1
 	
+	# === Fix R0 ==== #
+	#n_dates_tr + d_pred_ahead
 	# == Calculate Lambda first ==#
 	
 	# Initial intermediate
@@ -264,28 +314,26 @@ def event_sim( mdl_path_save, sim_path_save, n_dates_tr, n_dates_te, n_dates, n_
 	
 	# =============== Simulation  Drawing samples for background rate ============== #
 	
-	output_cnt = np.zeros((n_hzone, d_pred, n_sim))
+	output_cnt = np.zeros((n_hzone, d_pred_ahead, n_sim))
 	
 	#R0_est_sim = R0_est
 	R0_est = np.tile(np.expand_dims(R0_est, axis=3), [1, 1, 1, n_sim])
 	
-	new_mu = tf_lamb.numpy()[:, n_dates_tr: n_dates_tr + d_pred]
+	new_mu = tf_lamb.numpy()[:, n_dates_tr: n_dates_tr + d_pred_ahead]
 	new_mu = np.tile(np.expand_dims(new_mu, 2), [1, 1, n_sim])
 	
-	output_cnt = output_cnt + np.random.poisson(new_mu.flatten(order='F')).reshape((n_hzone, d_pred, n_sim),
-	                                                                               order='F')
-	tim_indx = np.expand_dims(np.expand_dims(np.expand_dims(np.arange(0, d_pred), axis=0), axis=1), axis=3)
+	output_cnt = output_cnt + np.random.poisson(new_mu.flatten(order='F')).reshape((n_hzone, d_pred_ahead, n_sim), order='F')
+	tim_indx = np.expand_dims(np.expand_dims(np.expand_dims(np.arange(0, d_pred_ahead), axis=0), axis=1), axis=3)
 	tim_indx = np.tile(tim_indx, [n_hzone, n_hzone, 1, n_sim])
 	
 	row_indx = np.expand_dims(np.expand_dims(np.expand_dims(np.arange(0, n_hzone), axis=1), axis=2), axis=3)
-	row_indx = np.tile(row_indx, [1, n_hzone, d_pred, n_sim])
+	row_indx = np.tile(row_indx, [1, n_hzone, d_pred_ahead, n_sim])
 	
 	sim_indx = np.expand_dims(np.expand_dims(np.expand_dims(range(0, n_sim), axis=0), axis=0), axis=0)
-	sim_indx = np.tile(sim_indx, [n_hzone, n_hzone, d_pred, 1])
+	sim_indx = np.tile(sim_indx, [n_hzone, n_hzone, d_pred_ahead, 1])
 	
 	# print(tim_indx.shape, row_indx.shape, R0_est_sim.shape, output_cnt.shape )
-	
-	for itr_pred in range(0, d_pred):
+	for itr_pred in range(0, d_pred_ahead):
 	
 	    output_cnt_in = np.expand_dims(output_cnt, 0);
 	    output_cnt_in = np.tile(output_cnt_in, [n_hzone, 1, 1, 1])
@@ -303,10 +351,11 @@ def event_sim( mdl_path_save, sim_path_save, n_dates_tr, n_dates_te, n_dates, n_
 	
 	    for itr_sim in range(0, n_sim):
 	        itr_sim, out_sparse = q_sim.get()  # Returns output or blocks until ready
+	        output_cnt[:, :, itr_sim] = output_cnt[:, :, itr_sim] + out_sparse.toarray()[:, 0:output_cnt.shape[1]]
 	
-	        output_cnt[:, :, itr_sim] = output_cnt[:, :, itr_sim] + out_sparse.toarray()
+	for each_p in ls_proc:
+		each_p.terminate()
 	
-
 	# ================================ Simulation results ================================#
 	mdic = {'output_cnt': output_cnt, 'covids_te': covids_te[:, 0:output_cnt.shape[1]]}
 	savemat( sim_path_save, mdic)
@@ -323,6 +372,7 @@ def arg_parse():
 	#parser.add_argument("--n_proc", 		type=str,	help="Number of processes", default=7)
 	#
 	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
+	parser.add_argument("--n_proc",         type=str,   help="Number of processes", default=30)
 	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=21)
 	#
 	parser.add_argument("--mdl_name", 		type=str,	help="Model Name", default='MHPsTsVarCoef')
@@ -417,7 +467,7 @@ def main():
 		event_sim( mdl_path_save, sim_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat_tstat, n_hzone, \
 				 covids, covids_te, COV_name, \
 				 COV_tvar_Xall, COV_tvar_X, COV_tvar_te, \
-				 COV_tstat_X, COV_tstat_te, smpl_wgt, alpha_shape, beta_scale \
+				 COV_tstat_X, COV_tstat_te, mdic\
 				)
 	
 if __name__ == "__main__":
