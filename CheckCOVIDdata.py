@@ -8,15 +8,16 @@ c.update('notebook', {"CodeCell": {"cm_config": {"autoCloseBrackets": False}}})
 '''
 
 # %%
-
 import numpy as np
 import pandas as pd
 import os, sys
 import shelve
+import pdb
 
 df_raw = pd.read_csv('../../Raw_Dataset/Castilla/01March_2020_27April_2021_CYL_Combined.csv');
 print('num of df_raw rows: ', df_raw.shape[0])
 
+pdb.set_trace()
 # %%
 
 # ----- Check the keys
@@ -111,6 +112,36 @@ df_death = df_death[df_death['hzone_code'].isin(ls_hzone_code_move)]
 df_demo.to_csv('./Input/Demo.csv', index=None)
 df_infect.to_csv('./Input/Infect.csv', index=None)
 df_death.to_csv('./Input/Death.csv', index=None)
+
+# ==== Read Shape file ==== #
+pathShape = './rawShapeFile/basicas.shp';
+myshpfile = geopandas.read_file( pathShape, encoding='latin1')
+
+# Convert to lat and log
+myshpfile = myshpfile.to_crs("EPSG:4326")
+
+# Find the ID for the healthzone
+# Read in the Demo files and find the id
+
+'''
+df_demo = pd.read_csv( '../../Input/Demo.csv' )
+df_demo = df_demo[['hzone_code','lon','lat']]
+
+df_demo['pt'] = df_demo.apply(lambda x: Point(x[['lon','lat']]), axis=1 )
+
+ls_idx_myshp = [];
+for each_pt in df_demo['pt']:
+    bool_within = myshpfile.apply(lambda x: each_pt.within(x['geometry']), axis=1 )
+    idx_myshp = np.where( bool_within )[0]
+
+    if idx_myshp.shape[0] >1:
+        pdb.set_trace()
+    else:
+        ls_idx_myshp.append(idx_myshp[0])
+
+df_demo['geometry'] = myshpfile.iloc[ls_idx_myshp]['geometry'].values
+df_demo.to_csv('../../Input/Geometry.csv')
+'''
 
 # %%
 

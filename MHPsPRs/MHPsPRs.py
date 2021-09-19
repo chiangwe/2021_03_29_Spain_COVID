@@ -112,18 +112,26 @@ parser.add_argument("--mode", type=str, help="# of maximum iterations", default=
 #
 parser.add_argument("--mdl_name", type=str, help="# of maximum iterations", default='MHPsPRs')
 parser.add_argument("--case_type", type=str, help="# of maximum iterations", default='confirm')
-parser.add_argument("--alpha_shape", type=str, help="Shape parameters for wbl", default=21)
-parser.add_argument("--beta_scale", type=str, help="bandwidth for the kernel", default=7)
+parser.add_argument("--alpha_shape", type=float, help="Shape parameters for wbl", default=2)
+parser.add_argument("--beta_scale", type=float, help="bandwidth for the kernel", default=10)
 
 args = parser.parse_args()
 
 # Assign to global
 dict_parser = [(each, getattr(args, each)) for each in args.__dict__.keys()]
-globals().update(dict(dict_parser))
+dict_parser = dict(dict_parser)
+globals().update(dict_parser)
 
 # Cast type 
 alpha_shape = float(alpha_shape)
 beta_scale = float(beta_scale)
+
+if (( dict_parser['alpha_shape']==0) & (dict_parser['beta_scale']==0)):
+	bool_wbl = True;
+	# Set initial
+	alpha_shape = 2; beta_scale=10;
+else:
+	bool_wbl = False;
 
 # %% ----- Set initial parameters -----#
 
@@ -131,10 +139,15 @@ for each_date in tqdm(date_ranges):
 
 	pred_st = (each_date - pd.Timedelta(1, unit='D')).strftime("%Y-%m-%d")
 	itr_d_st = ls_date_move.index(pred_st)
-	d_pred_ahead = 28;
+	d_pred_ahead = 21;
 
 	# ----- Set initial parameters -----#
-	para_str = 'type_' + case_type	+ '_alpha_' + str(int(alpha_shape)) + '_beta_' + str(int(beta_scale)) + '_predat_';
+	if bool_wbl == True:
+		para_str =  'type_' + case_type + '_alpha_' + str(0) + '_beta_' + str(0) + '_predat_';
+	else:
+		para_str =  'type_' + case_type + '_alpha_' + str(int(alpha_shape)) + '_beta_' + str(int(beta_scale)) + '_predat_';
+	
+	#para_str = 'type_' + case_type	+ '_alpha_' + str(int(alpha_shape)) + '_beta_' + str(int(beta_scale)) + '_predat_';
 
 	mdl_path_save = './mdl/' + mdl_name + '/' + mdl_name + '_Spain_' + para_str + each_date.strftime(
 		"%Y-%m-%d") + '.mat';
@@ -186,7 +199,9 @@ for each_date in tqdm(date_ranges):
 
 	mus = np.random.uniform(0.0005, 0.001, [n_hzone, 1]);
 	R0 = np.random.uniform(0.000005, 0.00001, [n_hzone, n_hzone, n_dates_tr]);	# (i, j , d_j)
-
+	
+	wbl_para = np.expand_dims( np.array([alpha_shape, beta_scale]), axis=1 )
+	
 	tolcoef = np.random.uniform(0.0005, 0.001, [COV_X.shape[1] + 1, 1])
 
 
@@ -201,7 +216,7 @@ for each_date in tqdm(date_ranges):
 	di_m_dj = np.tril(np.expand_dims(np.arange(0, n_dates_tr), 1) - np.expand_dims(np.arange(0, n_dates_tr), 0), -1);
 
 	# dict for checking the convergence, difference between previous variable and current variables
-	dict_delta = {'delta_mu': [], 'delta_tolcoef': []}
+	dict_delta = {'delta_mu': [], 'delta_tolcoef': [], 'delta_wbl':[]}
 
 	COV_t = np.unravel_index(range(0, COV.shape[0]), (n_hzone, n_hzone, n_dates), order='F')[2];
 	COV_X_t = np.unravel_index(range(0, COV_X.shape[0]), (n_hzone, n_hzone, n_dates_tr - ds_crt), order='F')[2];
@@ -273,6 +288,17 @@ for each_date in tqdm(date_ranges):
 					tf.expand_dims(tf.expand_dims(tf_lamb_epi, axis=(1)), axis=(3)) \
 					), \
 				axis=2) for itr_hzone in range(0, n_hzone)], axis=1);
+
+		
+		weight_wbl = tf.math.reduce_sum( \
+				tf.math.multiply( tf.expand_dims( tf.squeeze(tf_covid_dj), 1), \
+			tf.concat([ \
+			tf.math.reduce_sum( \
+				tf.math.divide( \
+					tf.math.multiply(tf_R0[:, itr_hzone:itr_hzone + 1, :, :], tf_di_wbl), \
+					tf.expand_dims(tf.expand_dims(tf_lamb, axis=(1)), axis=(3)) \
+					), \
+				axis=0) for itr_hzone in range(0, n_hzone)], axis=0) ) , axis=0);
 		# pdb.set_trace()
 		# ================================ M step ================================#
 
@@ -304,23 +330,43 @@ for each_date in tqdm(date_ranges):
 		R0_est[R0_est > 1] = 1;
 		R0_est = np.reshape(R0_est, [n_hzone, n_hzone, n_dates], order='F')
 		R0_est = R0_est[:, :, 0:n_dates_tr]
-
-		# ----- Update WBL -----#
-
-		# alpha_shape_est = alpha_shape
-		# beta_scale_est = beta_scale
+		
+		# ----- Estimate Update Alpha Beta ----- #
+		if bool_wbl:
+			indx = np.tril_indices(n_dates_tr - ds_crt, -1)
+			obs = indx[0] - indx[1]
+			weight_wbl = weight_wbl.numpy()[indx[0], indx[1]]
+			
+			obs_weight = pd.DataFrame( np.vstack((obs, weight_wbl)).T, \
+			            columns=['obs','weight_wbl']).groupby('obs').sum().reset_index()
+			obs_weight['weight_wbl'] = obs_weight['weight_wbl']/obs_weight['weight_wbl'].sum()
+			
+			#print(np.unique( np.random.choice(obs_weight['obs'], 100000, p=obs_weight['weight_wbl']) ))
+			wel_est = weibull_min.fit( np.random.choice(obs_weight['obs'], 100000, p=obs_weight['weight_wbl']), floc=0 )
+			
+			alpha_shape_est = wel_est[0]
+			beta_scale_est = wel_est[2]
+		else:
+			alpha_shape_est = copy.deepcopy(alpha_shape)
+			beta_scale_est  = copy.deepcopy(beta_scale)
+		
+		wbl_para_est = np.expand_dims( np.array([alpha_shape_est, beta_scale_est]), axis=1 )
+		
 		# ================================ Calculate the difference parameter ================================#
 
 		dict_delta['delta_mu'].append(para_diff(mus, mus_est));
 		dict_delta['delta_tolcoef'].append(para_diff(tolcoef, tolcoef_est));
-
+		dict_delta['delta_wbl'].append(para_diff( wbl_para, wbl_para_est));
+		
 		# ================================ Update all parameter ================================#
 
 		mus = np.expand_dims(mus_est.copy(), axis=1);
 		tolcoef = copy.deepcopy(tolcoef_est);
 
 		R0 = R0_est.copy()
-
+		alpha_shape = copy.deepcopy(alpha_shape_est)
+		beta_scale = copy.deepcopy(beta_scale_est)
+		wbl_para = copy.deepcopy(wbl_para_est)
 
 		print("Itr: ", "{:04d}".format(itr_em), \
 			  ", mus_mean: ", "{:6f}".format(mus.mean()), \
@@ -328,14 +374,16 @@ for each_date in tqdm(date_ranges):
 			  ", R0_mean: ", "{:.6f}".format(R0.mean()), \
 			  ", tolcoef_mean: ", "{:.6f}".format(np.abs(tolcoef).mean()), \
 			  ", tolcoef_diff: ", "{:.6e}".format(dict_delta['delta_tolcoef'][-1]), \
-			  alpha_shape, beta_scale)
+			  ", delta_wbl: ", "{:.6e}".format(dict_delta['delta_wbl'][-1]), \
+			  ", alpha_shape: ", "{:.3e}".format(alpha_shape), ", beta_scale: ", "{:.3e}".format(beta_scale))
 
 		# print(mus.mean(), R0.mean(), alpha_shape, beta_scale_est)
 
 		# ----- Early Stop -------#
-		if itr_em > 5:
-			if (np.all(np.array(dict_delta['delta_tolcoef'][-5:]) < tol) & np.all(
-					np.array(dict_delta['delta_mu'][-5:]) < tol)):
+		if itr_em > 3:
+			if (	  np.all( np.array(dict_delta['delta_tolcoef'][-3:]) < tol) \
+					& np.all( np.array(dict_delta['delta_mu'][-5:]) < tol) \
+					& np.all( np.array(          dict_delta['delta_wbl'][-3:]) < 10**-1) ):
 				break;
 
 	# ================================ Save what I think that is important ================================#
