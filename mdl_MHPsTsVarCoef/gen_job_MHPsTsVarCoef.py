@@ -42,7 +42,9 @@ date_ranges = [ each.strftime('%Y-%m-%d') for each in date_ranges ]
 
 Method = 'MHPsTsVarCoef'
 case_type = [ 'confirm', 'death' ]
-ls_bw = [ '5', '10'];
+#ls_bw = [ '5', '10'];
+
+ls_bw = [ '30'];
 ls_alpha_shape = [ '0' ];
 ls_beta_scale = [ '0' ];
 
