@@ -142,23 +142,36 @@ def wis(y_true, y_all):
 
 #%% ----- Set initial parameters -----#
 
-ls_method = [ 'UHPOnly', 'MHPsOnly', 'MHPsPRs', 'MHPsTsVarCoef', 'MHPsTsVarGeoVarCoef'];
-#ls_method = [ 'UHPOnly'];
+#ls_method = [ 'UHPOnly', 'MHPsOnly', 'MHPsPRs', 'MHPsTsVarCoef', 'MHPsTsVarGeoVarCoef'];
+ls_method = [ 'UHPOnly', 'MHPsOnly', 'MHPsPRs', 'MHPsTsVarCoef'];
+ls_method_wblEst = [ 'UHPOnly', 'MHPsPRs', 'MHPsTsVarCoef'];
 
 ls_pred = [7, 14, 21];
 
 df_eval = pd.DataFrame(columns=['methods', 'quan', 'type', 'predat', 'week_ahead','para', 'abs', 'wis', 'ndcg']);
 
 for each_method in ls_method:
-	for file in os.listdir( './results/' + each_method ):
+	ls_files = os.listdir( './mdl_' +  each_method + '/results/' + each_method + '/' );
+	
+	# We only look into estimated wbl distribution
+	if each_method in ls_method_wblEst:
+		ls_files = [ each for each in ls_files if 'alpha_0_beta_0_' in each ]
+	
+	ls_files.sort()
+
+	for file in ls_files:
 		print(file)
 		if '.mat' not in file:
 			continue;
 		else:
-			mat_dict = loadmat( './results/' + each_method + '/' + file );
+			
+			mat_dict = loadmat( './mdl_' +  each_method + '/results/' + each_method + '/' + file );
 			covids_te = mat_dict['covids_te']
 			output_cnt = mat_dict['output_cnt']
 
+			if covids_te.shape[1] == 0:
+				continue;
+				
 			ls_str = file.replace('.mat', '').split('_');
 
 			pred_day = ls_str[-1]
@@ -172,6 +185,7 @@ for each_method in ls_method:
 			pred_cnt = np.array([output_cnt[:, (each - 1) * 7: each * 7, :].sum(1) for each in [1, 2, 3]]);
 
 			for itr_d_pred in range(0, len(ls_pred) ):
+				
 				WIS, abs_out = wis(gt_cnt[:, itr_d_pred], pred_cnt[itr_d_pred, :, :])
 				
 				for itr_quan in range(0, len(QuanName) ):
@@ -194,7 +208,7 @@ for each_method in ls_method:
 					
 					df_eval = df_eval.append(new_data, ignore_index=True)
 
-df_val_mean = df_eval.groupby(['methods', 'type', 'quan', 'week_ahead']).mean().reset_index()
+df_val_mean = df_eval.groupby(['methods', 'type', 'quan', 'para' ,'week_ahead']).mean().reset_index()
 
 
 # Formatting 

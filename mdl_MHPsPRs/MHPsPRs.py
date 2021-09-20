@@ -382,7 +382,7 @@ for each_date in tqdm(date_ranges):
 		# ----- Early Stop -------#
 		if itr_em > 3:
 			if (	  np.all( np.array(dict_delta['delta_tolcoef'][-3:]) < tol) \
-					& np.all( np.array(dict_delta['delta_mu'][-5:]) < tol) \
+					& np.all( np.array(dict_delta['delta_mu'][-3:]) < tol) \
 					& np.all( np.array(          dict_delta['delta_wbl'][-3:]) < 10**-1) ):
 				break;
 

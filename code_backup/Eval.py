@@ -111,7 +111,6 @@ def wis(y_true, y_all):
 #%% ----- Set initial parameters -----#
 
 ls_method = [ 'UHPOnly', 'MHPsOnly', 'MHPsPRs', 'MHPsTsVarCoef', 'MHPsTsVarGeoVarCoef'];
-#ls_method = [ 'UHPOnly'];
 
 ls_pred = [7, 14, 21];
 
