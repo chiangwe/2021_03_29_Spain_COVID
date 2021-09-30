@@ -208,10 +208,11 @@ for each_method in ls_method:
 					
 					df_eval = df_eval.append(new_data, ignore_index=True)
 
-df_val_mean = df_eval.groupby(['methods', 'type', 'quan', 'para' ,'week_ahead']).mean().reset_index()
+
+#df_val_mean = df_eval.groupby(['methods', 'type', 'quan', 'para' ,'week_ahead']).mean().reset_index()
 
 
 # Formatting 
-
-df_val_mean.to_csv('./results_tables/agg_results.csv', index=False)
+df_eval.to_csv('./results_tables/raw_results.csv', index=False)
+#df_val_mean.to_csv('./results_tables/agg_results.csv', index=False)
 

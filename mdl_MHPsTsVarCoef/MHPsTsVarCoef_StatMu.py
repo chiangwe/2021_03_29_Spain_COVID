@@ -1,3 +1,7 @@
+# This is to check the coefficients
+# Don't save anythin in the old file.
+#
+
 #%% ----- Import packages -----#
 
 import sys
@@ -565,9 +569,9 @@ def arg_parse():
 	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
 	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
 	#
-	parser.add_argument("--mdl_name", 		type=str,	help="# of maximum iterations", default='MHPsTsVarCoef')
+	parser.add_argument("--mdl_name", 		type=str,	help="# of maximum iterations", default='MHPsTsVarCoef_StatMu')
 	parser.add_argument("--case_type", 		type=str,	help="# of maximum iterations", default='confirm')
-	parser.add_argument("--bw",			 	type=float, help="bandwidth for the kernel", default=1) #[50 1] 
+	parser.add_argument("--bw",			 	type=float, help="bandwidth for the kernel", default=5) #[50 1] 
 	parser.add_argument("--d_pr",          	type=float, help="days used for regression", default=30) #[30 60]
 	parser.add_argument("--pd_date",		type=str, help="start date for prediction", default=30)
 	parser.add_argument("--alpha_shape", 	type=float, help="Shape parameters for wbl", default= 2)
@@ -637,7 +641,7 @@ def main():
 	# Over write the data range since we are doing one a a time 
 	date_ranges = [each_date]
 	
-	for each_date in tqdm(date_ranges):
+	for each_date in tqdm(date_ranges[-1:]):
 		
 		# ----- Set initial parameters -----#
 		if bool_wbl == True:
