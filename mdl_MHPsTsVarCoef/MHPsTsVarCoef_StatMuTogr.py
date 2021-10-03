@@ -206,7 +206,7 @@ def PR_fit_tvar( q_PR, q_job, q_data, arr_states, proc_id):
 			#print("arr_states[proc_id]: ", arr_states[proc_id])
 			COV_tvar_Xall, COV_tvar_X_t, COV_tstat_X, \
 			smpl_wgt, n_hzone, n_dates_tr, ds_crt = q_data.get(block=True)
-			
+			#'''	
 			# Update State
 			arr_states[proc_id] = 1;
 		elif( ( arr_states[proc_id] == 1 ) & (q_data.empty()==True)  ):
@@ -218,11 +218,13 @@ def PR_fit_tvar( q_PR, q_job, q_data, arr_states, proc_id):
 		elif( ( arr_states[proc_id] == 2 ) ):
 			
 			#print("arr_states[proc_id]: ", arr_states[proc_id])
-			y_tr, R0_tvar, R0_tstat = q_data.get(block=True)
+			y_tr, R0 = q_data.get(block=True)
 			
 			# Update State
 			arr_states[proc_id] = 3;
-			
+			#'''
+			#y_tr, R0 = q_data.get(block=True)	
+			#arr_states[proc_id] = 3;
 		elif( (arr_states[proc_id] == 3) & (q_job.empty() != True ) ):
 			#print("arr_states[proc_id]: ", arr_states[proc_id])
 			try:
@@ -251,15 +253,22 @@ def PR_fit_tvar( q_PR, q_job, q_data, arr_states, proc_id):
 			new_weight = np.exp( -(new_weight_pre ** 2)/2 ) / ((np.sqrt(2*np.pi))*bw) 
 			new_weight = np.multiply( smpl_wgt[tr_st:tr_ed], new_weight)
 			
-			weight_adjust = np.tile( R0_tstat[:, :, 0:n_dates_tr-ds_crt], [ n_hzone, 1, 1 ]).flatten(order='F')[tr_st:tr_ed]\
-						    + np.finfo(float).eps**3;
+			#weight_adjust = np.tile( R0_tstat[:, :, 0:n_dates_tr-ds_crt], [ n_hzone, 1, 1 ]).flatten(order='F')[tr_st:tr_ed]\
+			#			    + np.finfo(float).eps**3;
 			
 			# Remove weight == 0 
-			weight_in = new_weight * weight_adjust + np.finfo(float).eps**3;
+			#weight_in = new_weight * weight_adjust + np.finfo(float).eps**3;
+			weight_in = new_weight + np.finfo(float).eps**3;
 			weight_in = weight_in/np.max(weight_in);
 			
-			y_tr_in = y_tr[tr_st:tr_ed]/weight_adjust;
+			#y_tr_in = y_tr[tr_st:tr_ed]/weight_adjust;
+			y_tr_in = y_tr[tr_st:tr_ed]
 			COV_tvar_in = COV_tvar_Xall[tr_st:tr_ed, :]
+			
+			COV_tvar_in = np.hstack( ( COV_tvar_in,
+					np.tile( np.expand_dims( np.expand_dims( COV_tstat_X, 0), 2), [n_hzone,1, int((tr_ed-tr_st)/n_hzone/n_hzone), 1] )\
+				   	.reshape((n_hzone * n_hzone * int((tr_ed-tr_st)/n_hzone/n_hzone), 20), order='F')\
+									)) 
 			
 			idx_keep = np.where(weight_in!=0)
 			
@@ -268,64 +277,24 @@ def PR_fit_tvar( q_PR, q_job, q_data, arr_states, proc_id):
 			theta_est = clf.coef_;
 			intercept_est = clf.intercept_;
 			coef_tvar = np.hstack((intercept_est, theta_est))
-
-			R0_tvar_est = clf.predict( COV_tvar_Xall[ each_t * n_hzone * n_hzone: (each_t + 1) * n_hzone * n_hzone, :] );
+			
+			R0_est = clf.predict( \
+						np.hstack(( COV_tvar_Xall[ each_t * n_hzone * n_hzone: (each_t + 1) * n_hzone * n_hzone, :],\
+					np.tile( np.expand_dims( np.expand_dims( COV_tstat_X, 0), 2), [n_hzone,1, 1, 1] )\
+					.reshape((n_hzone * n_hzone * 1, 20), order='F')\
+				)) );
 			
 			# Get Standard Error of Beta Coefficients
-			sdr_coef_tvar     = stats.coef_se( clf, COV_tvar_in[idx_keep[0], :], y_tr_in[idx_keep])
+			sdr_coef_tvar     = stats.coef_se(   clf, COV_tvar_in[idx_keep[0], :], y_tr_in[idx_keep])
 			# Get T-values of Beta Coefficients
 			tval_coef_tvar    = stats.coef_tval( clf, COV_tvar_in[idx_keep[0], :], y_tr_in[idx_keep])
 			# Get P-values of Beta Coefficients
 			pval_coef_tvar    = stats.coef_pval( clf, COV_tvar_in[idx_keep[0], :], y_tr_in[idx_keep])
 			# Get F-statistic
-			f_stat_coef_tvar  = stats.f_stat( clf, COV_tvar_in[idx_keep[0], :], y_tr_in[idx_keep])
+			f_stat_coef_tvar  = stats.f_stat(    clf, COV_tvar_in[idx_keep[0], :], y_tr_in[idx_keep])
 			
-			#stats.summary( clf, COV_tvar_in[idx_keep[0], :], y_tr_in[idx_keep], ['Double'])
-			
-			# Model the statistic feature 
-			clf = linear_model.PoissonRegressor(fit_intercept=False)
-			
-			weight_adjust = R0_tvar[ :, :, 0:(n_dates_tr-ds_crt) ].flatten(order='F')[tr_st:tr_ed];
-			
-			# Remove weight == 0
-			weight_in = new_weight * weight_adjust + np.finfo(float).eps**3;
-			
-			y_tr_in = y_tr[tr_st:tr_ed]/weight_adjust;
-			
-			hz_j = np.unravel_index( range(0, y_tr.shape[0]), (n_hzone, n_hzone, (n_dates_tr-ds_crt) ), order='F')[1][tr_st:tr_ed];	
-			
-			data_in = pd.DataFrame( np.vstack((y_tr_in, weight_in, y_tr_in*weight_in ,hz_j)).T ).groupby(by=3).sum().reset_index()
-			data_in = data_in.sort_values(by=3)
-			
-			idx_keep = np.where(data_in[1].values!=0)[0]
-			
-			y_tr_in = (data_in[2]/data_in[1]).values
-			weight_in = data_in[1].values
-			weight_in = weight_in/np.max(weight_in);
-			
-			clf.fit( COV_tstat_X[idx_keep, :], y_tr_in[idx_keep], weight_in[idx_keep]+np.finfo(float).eps**2)
-			
-			theta_est = clf.coef_;
-			intercept_est = clf.intercept_;
-			#coef_tstat = np.hstack((intercept_est, theta_est))
-			coef_tstat = theta_est.copy()
-			
-			R0_tstat_est = clf.predict( COV_tstat_X );
-			R0_tstat_est = np.tile( np.expand_dims( R0_tstat_est, axis=0), [ n_hzone, 1] ).flatten(order='F')
-			
-			# Get Standard Error of Beta Coefficients
-			sdr_coef_tstat     = stats.coef_se( clf, COV_tstat_X[idx_keep, :], y_tr_in[idx_keep])
-			# Get T-values of Beta Coefficients
-			tval_coef_tstat    = stats.coef_tval( clf, COV_tstat_X[idx_keep, :], y_tr_in[idx_keep])
-			# Get P-values of Beta Coefficients
-			pval_coef_tstat    = stats.coef_pval( clf, COV_tstat_X[idx_keep, :], y_tr_in[idx_keep])
-			# Get F-statistic
-			f_stat_coef_tstat  = stats.f_stat( clf, COV_tstat_X[idx_keep, :], y_tr_in[idx_keep])
-			
-			
-			q_PR.put( (each_t, coef_tvar, coef_tstat, R0_tvar_est, R0_tstat_est,\
-			sdr_coef_tvar, tval_coef_tvar, pval_coef_tvar, f_stat_coef_tvar,\
-			sdr_coef_tstat, tval_coef_tstat, pval_coef_tstat, f_stat_coef_tstat ) )
+			q_PR.put( (each_t, coef_tvar, R0_est,\
+			sdr_coef_tvar, tval_coef_tvar, pval_coef_tvar, f_stat_coef_tvar) )
 		else:
 			#print("arr_states[proc_id]: ", arr_states[proc_id])
 			time.sleep(0.1)
@@ -341,17 +310,19 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 	# Initial Coefficient 
 	mus = np.random.uniform(  0.0005,   0.001, [ n_hzone, 1]);
 	
-	R0_tvar   = np.random.uniform(0.0000005, 0.000001, [ n_hzone, n_hzone, n_dates ]);
-	R0_tstat  = np.random.uniform(0.0000005, 0.000001, [       1, n_hzone, n_dates ]);
-	R0  = np.multiply( R0_tvar, R0_tstat )
+	#R0_tvar   = np.random.uniform(0.005, 0.01, [ n_hzone, n_hzone, n_dates ]);
+	#R0_tstat  = np.random.uniform(0.005, 0.01, [       1, n_hzone, n_dates ]);
+	#R0  = np.multiply( R0_tvar, R0_tstat )
+	R0  = np.random.uniform(0.005, 0.01, [ n_hzone, n_hzone, n_dates ]);
 	
 	wbl_para = np.expand_dims( np.array([alpha_shape, beta_scale]), axis=1 )
 	
-	tolcoef_tvar  = np.random.uniform(0.0005, 0.001,[  n_feat_tvar + 1, n_dates])
-	tolcoef_tstat = np.random.uniform(0.0005, 0.001,[ n_feat_tstat , n_dates])
+	tolcoef_tvar  = np.random.uniform(0.0005, 0.001,[  n_feat_tvar + n_feat_tstat + 1, n_dates])
+	#tolcoef_tstat = np.random.uniform(0.0005, 0.001,[ n_feat_tstat , n_dates])
 	
 	# dict for checking the convergence, difference between previous variable and current variables
-	dict_delta = {'delta_mu': [], 'delta_tolcoef_tvar': [], 'delta_tolcoef_tstat': [], 'delta_wbl':[]}
+	#dict_delta = {'delta_mu': [], 'delta_tolcoef_tvar': [], 'delta_tolcoef_tstat': [], 'delta_wbl':[]}
+	dict_delta = {'delta_mu': [], 'delta_tolcoef_tvar': [], 'delta_wbl':[]}
 	
 	# Create Time index  
 	COV_tvar_X_t  = np.unravel_index( range(0, COV_tvar_X.shape[0]), \
@@ -463,23 +434,16 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 		# ------------------------------------- #
 		
 		for each_proc in range(0, n_proc):
-			q_data.put( ( y_tr, R0_tvar, R0_tstat ) )
+			q_data.put( ( y_tr, R0 ) )
 		
-		tolcoef_tvar_est  = np.zeros( ( COV_tvar_X.shape[1] + 1,  n_dates ) )
-		tolcoef_tstat_est = np.zeros( ( COV_tstat_X.shape[1], n_dates ) )
+		tolcoef_tvar_est  = np.zeros( ( COV_tvar_X.shape[1]+COV_tstat_X.shape[1]+ 1,  n_dates ) )
 		
-		tolsdr_coef_tvar     = np.zeros( ( COV_tvar_X.shape[1] + 1,  n_dates ) )
-		toltval_coef_tvar    = np.zeros( ( COV_tvar_X.shape[1] + 1,  n_dates ) ) 
-		tolpval_coef_tvar    = np.zeros( ( COV_tvar_X.shape[1] + 1,  n_dates ) )
+		tolsdr_coef_tvar     = np.zeros( ( COV_tvar_X.shape[1]+COV_tstat_X.shape[1] + 1,  n_dates ) )
+		toltval_coef_tvar    = np.zeros( ( COV_tvar_X.shape[1]+COV_tstat_X.shape[1] + 1,  n_dates ) ) 
+		tolpval_coef_tvar    = np.zeros( ( COV_tvar_X.shape[1]+COV_tstat_X.shape[1] + 1,  n_dates ) )
 		tolf_stat_coef_tvar  = np.zeros( ( 1,  n_dates ) )
 		
-		tolsdr_coef_tstat    = np.zeros( ( COV_tstat_X.shape[1] + 1,  n_dates ) ) 
-		toltval_coef_tstat   = np.zeros( ( COV_tstat_X.shape[1] + 1,  n_dates ) ) 
-		tolpval_coef_tstat   = np.zeros( ( COV_tstat_X.shape[1] + 1,  n_dates ) )
-		tolf_stat_coef_tstat = np.zeros( ( 1,  n_dates ) )
-		
-		R0_tvar_est  = np.zeros( ( n_hzone*n_hzone*n_dates, ))
-		R0_tstat_est = np.zeros( ( n_hzone*n_hzone*n_dates, ))
+		R0_est  = np.zeros( ( n_hzone*n_hzone*n_dates, ))
 		
 		bw_obj  = np.zeros( ( n_dates, ))
 		bw_grad = np.zeros( ( n_dates, ))
@@ -490,28 +454,23 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 		for each_t in s_processes:
 			q_job.put(each_t)
 		
+		#PR_fit_tvar( q_PR, q_job, q_data, arr_states, 0)
+		#pdb.set_trace()
+		
 		for each_q in tqdm(s_processes):
-			each_t, coef_tvar, coef_tstat, r0_tvar, r0_tstat,\
-			sdr_coef_tvar, tval_coef_tvar, pval_coef_tvar, f_stat_coef_tvar,\
-            sdr_coef_tstat, tval_coef_tstat, pval_coef_tstat, f_stat_coef_tstat = q_PR.get()
+			each_t, coef_tvar, r0_tvar,\
+			sdr_coef_tvar, tval_coef_tvar, pval_coef_tvar, f_stat_coef_tvar  = q_PR.get()
 			
 			tolcoef_tvar_est[:, each_t]  = coef_tvar
-			tolcoef_tstat_est[:, each_t] = coef_tstat
 			#
 			tolsdr_coef_tvar[:, each_t]     = sdr_coef_tvar
 			toltval_coef_tvar[:, each_t]    = tval_coef_tvar
 			tolpval_coef_tvar[:, each_t]    = pval_coef_tvar
 			tolf_stat_coef_tvar[:, each_t]  = f_stat_coef_tvar
 			#
-			tolsdr_coef_tstat[:, each_t] = sdr_coef_tstat
-			toltval_coef_tstat[:, each_t] = tval_coef_tstat
-			tolpval_coef_tstat[:, each_t] = pval_coef_tstat
-			tolf_stat_coef_tstat[:, each_t] = f_stat_coef_tstat
-			#
-			R0_tvar_est[ each_t * n_hzone * n_hzone: (each_t + 1) * n_hzone * n_hzone, ]  = r0_tvar
-			R0_tstat_est[each_t * n_hzone * n_hzone: (each_t + 1) * n_hzone * n_hzone, ] = r0_tstat
+			R0_est[ each_t * n_hzone * n_hzone: (each_t + 1) * n_hzone * n_hzone, ]  = r0_tvar
 		
-		R0_est = R0_tvar_est * R0_tstat_est;
+		#R0_est = R0_tvar_est * R0_tstat_est;
 
 		# ----- Estimate Update Alpha Beta ----- #
 		if bool_wbl:
@@ -535,10 +494,6 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 		# Reshape mus, R0, (alpha_shape, beta_scale)
 		R0_est = np.reshape( R0_est, [n_hzone,n_hzone,n_dates],order='F' )
 		
-		R0_tvar_est = np.reshape( R0_tvar_est, [n_hzone,n_hzone,n_dates],order='F' )
-		
-		R0_tstat_est = np.reshape( R0_tstat_est, [n_hzone,n_hzone,n_dates],order='F' )[0, :, :]
-		R0_tstat_est = np.expand_dims( R0_tstat_est, axis=0)
 		
 		mus_est = np.expand_dims( mus_est, axis=1 )
 		
@@ -547,17 +502,16 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 
 		dict_delta['delta_mu'].append(para_diff(mus, mus_est));
 		dict_delta['delta_tolcoef_tvar'].append(para_diff( tolcoef_tvar,  tolcoef_tvar_est));
-		dict_delta['delta_tolcoef_tstat'].append(para_diff( tolcoef_tstat, tolcoef_tstat_est));
 		dict_delta['delta_wbl'].append(para_diff( wbl_para, wbl_para_est));
 		
 		
 		# ================================ Update all parameter ================================#
 		mus           = copy.deepcopy(mus_est)
-		R0_tvar       = copy.deepcopy(R0_tvar_est)
-		R0_tstat      = copy.deepcopy(R0_tstat_est)
+		#R0_tvar       = copy.deepcopy(R0_tvar_est)
+		#R0_tstat      = copy.deepcopy(R0_tstat_est)
 		R0            = copy.deepcopy(R0_est)
 		tolcoef_tvar  = copy.deepcopy(tolcoef_tvar_est)
-		tolcoef_tstat = copy.deepcopy( tolcoef_tstat_est )
+		#tolcoef_tstat = copy.deepcopy( tolcoef_tstat_est )
 		alpha_shape = copy.deepcopy(alpha_shape_est)
 		beta_scale = copy.deepcopy(beta_scale_est)
 		wbl_para = copy.deepcopy(wbl_para_est)
@@ -568,13 +522,13 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 			  ", wbl_diff: ", "{:6e}".format(dict_delta['delta_wbl'][-1]), \
 			  ", R0_mean: ", "{:.8f}".format(R0.mean()), \
 			  ", delta_tolcoef_tvar: ", "{:.6e}".format(dict_delta['delta_tolcoef_tvar'][-1]), \
-			  ", delta_tolcoef_tstat: ", "{:.6e}".format(dict_delta['delta_tolcoef_tstat'][-1]), \
+			  #", delta_tolcoef_tstat: ", "{:.6e}".format(dict_delta['delta_tolcoef_tstat'][-1]), \
 			  ", delta_wbl: ", "{:.6e}".format(dict_delta['delta_wbl'][-1]), \
 			  ", alpha_shape: ", "{:.3e}".format(alpha_shape), ", beta_scale: ", "{:.3e}".format(beta_scale))
 		#----- Early Stop -------#
 		if itr_em > 3:
 			if (   np.all( np.array( dict_delta['delta_tolcoef_tvar'][-3:]) < tol         ) \
-				 & np.all( np.array(dict_delta['delta_tolcoef_tstat'][-3:]) < tol         ) \
+				 #& np.all( np.array(dict_delta['delta_tolcoef_tstat'][-3:]) < tol         ) \
 				 & np.all( np.array(           dict_delta['delta_mu'][-3:]) < tol         ) \
 				 & np.all( np.array(          dict_delta['delta_wbl'][-3:]) < 10**-1      )):
 				
@@ -590,12 +544,12 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 			arr_states[proc_id] = 1
 	# ================================ Save what I think that is important ================================#
 	mdic = { \
-		'mus': mus, 'R0': R0, 'R0_tvar':R0_tvar, 'R0_tstat':R0_tstat,\
+		'mus': mus, 'R0': R0,\
 		'alpha_shape': alpha_shape, 'beta_scale': beta_scale, \
 		'tolsdr_coef_tvar':tolsdr_coef_tvar, 'toltval_coef_tvar':toltval_coef_tvar,\
 		'tolpval_coef_tvar':tolpval_coef_tvar, 'tolf_stat_coef_tvar':tolf_stat_coef_tvar,\
-		'tolsdr_coef_tstat':tolsdr_coef_tstat, 'toltval_coef_tstat':toltval_coef_tstat,\
-		'tolpval_coef_tstat':tolpval_coef_tstat, 'tolf_stat_coef_tstat':tolf_stat_coef_tstat,\
+		#'tolsdr_coef_tstat':tolsdr_coef_tstat, 'toltval_coef_tstat':toltval_coef_tstat,\
+		#'tolpval_coef_tstat':tolpval_coef_tstat, 'tolf_stat_coef_tstat':tolf_stat_coef_tstat,\
 		'COV_name': COV_name, 'tolcoef_tvar': tolcoef_tvar, 'tolcoef_tstat':tolcoef_tstat\
 		}
 	savemat(mdl_path_save, mdic)
@@ -620,7 +574,7 @@ def arg_parse():
 	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
 	parser.add_argument("--d_pred_ahead", 	type=int,	help="Number of days ahead for prediction", default=28)
 	#
-	parser.add_argument("--mdl_name", 		type=str,	help="# of maximum iterations", default='MHPsTsVarCoef_StatMu')
+	parser.add_argument("--mdl_name", 		type=str,	help="# of maximum iterations", default='MHPsTsVarCoef_StatMuTogr')
 	parser.add_argument("--case_type", 		type=str,	help="# of maximum iterations", default='confirm')
 	parser.add_argument("--bw",			 	type=float, help="bandwidth for the kernel", default=5) #[50 1] 
 	parser.add_argument("--d_pr",          	type=float, help="days used for regression", default=30) #[30 60]
@@ -652,7 +606,8 @@ def arg_parse():
 	if ( myhost == 'volta'):
 		n_proc = 30
 	elif ( myhost == 'gibson.science.iupui.edu' ):
-		n_proc = 25
+		#n_proc = 25
+		n_proc = 15
 	else:
 		n_proc = 5
 	
@@ -677,12 +632,13 @@ def main():
 	q_data = multiprocessing.Queue()
 	arr_states = multiprocessing.Array('i', [0]*n_proc )
 	
+	#'''
 	ls_proc = [];
 	for each_proc in range(0, n_proc):
 		p = multiprocessing.Process(target=PR_fit_tvar, args=( q_PR, q_job, q_data, arr_states, each_proc ))
 		p.start()
 		ls_proc.append(p)
-	
+	#'''
 	# Load The raw data 
 	df_infect, df_death, df_demo, ls_arr_move, ls_date_move, ls_hzone_code_move, date_ranges = \
 		raw_data_load( path_demo, path_infect, path_death, path_movement )
