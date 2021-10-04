@@ -28,6 +28,7 @@ import shelve
 import copy
 from tqdm import tqdm
 from sklearn import linear_model
+from regressors import stats
 import shelve
 from scipy.io import savemat
 #from set_size import set_size
@@ -40,7 +41,8 @@ import pdb
 print("python_version: ", python_version())
 
 # Force to use CUP since I don't have access
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 if tf.test.gpu_device_name():
 	print('GPU found')
@@ -112,8 +114,8 @@ parser.add_argument("--mode", type=str, help="# of maximum iterations", default=
 #
 parser.add_argument("--mdl_name", type=str, help="# of maximum iterations", default='MHPsPRs')
 parser.add_argument("--case_type", type=str, help="# of maximum iterations", default='confirm')
-parser.add_argument("--alpha_shape", type=float, help="Shape parameters for wbl", default=2)
-parser.add_argument("--beta_scale", type=float, help="bandwidth for the kernel", default=10)
+parser.add_argument("--alpha_shape", type=float, help="Shape parameters for wbl", default=0)
+parser.add_argument("--beta_scale", type=float, help="bandwidth for the kernel", default=0)
 
 args = parser.parse_args()
 
@@ -135,7 +137,7 @@ else:
 
 # %% ----- Set initial parameters -----#
 
-for each_date in tqdm(date_ranges):
+for each_date in tqdm(date_ranges[-1]):
 
 	pred_st = (each_date - pd.Timedelta(1, unit='D')).strftime("%Y-%m-%d")
 	itr_d_st = ls_date_move.index(pred_st)
@@ -153,6 +155,7 @@ for each_date in tqdm(date_ranges):
 		"%Y-%m-%d") + '.mat';
 
 	# ------- Check trained ---------#
+	pdb.set_trace()
 	print(mdl_path_save)
 	if os.path.exists(mdl_path_save):
 		continue;
@@ -322,7 +325,17 @@ for each_date in tqdm(date_ranges):
 		theta_est = clf.coef_;
 		intercept_est = clf.intercept_;
 		tolcoef_est = np.hstack((intercept_est, theta_est))
-
+		
+		# Get Standard Error of Beta Coefficients
+		sdr_coef     = stats.coef_se(   clf, COV_X, y )
+		# Get T-values of Beta Coefficients
+		tval_coef    = stats.coef_tval( clf, COV_X, y )
+		# Get P-values of Beta Coefficients
+		pval_coef    = stats.coef_pval( clf, COV_X, y )
+		# Get F-statistic
+		f_stat_coef  = stats.f_stat(    clf, COV_X, y )
+		# sdr_coef, tval_coef, pval_coef, f_stat_coef
+		
 		# theta_est = clf.coef_;
 		# intercept_est = clf.intercept_;
 
@@ -389,6 +402,7 @@ for each_date in tqdm(date_ranges):
 	# ================================ Save what I think that is important ================================#
 	mdic = { \
 		'mus': mus, 'R0': R0, 'alpha_shape': alpha_shape, 'beta_scale': beta_scale, \
+		'sdr_coef':sdr_coef, 'tval_coef':tval_coef, 'pval_coef':pval_coef, 'f_stat_coef':f_stat_coef, \
 		'COV_name': COV_name, 'tolcoef': tolcoef \
 		}
 	savemat(mdl_path_save, mdic)

@@ -267,7 +267,7 @@ def PR_fit_tvar( q_PR, q_job, q_data, arr_states, proc_id):
 			
 			COV_tvar_in = np.hstack( ( COV_tvar_in,
 					np.tile( np.expand_dims( np.expand_dims( COV_tstat_X, 0), 2), [n_hzone,1, int((tr_ed-tr_st)/n_hzone/n_hzone), 1] )\
-				   	.reshape((n_hzone * n_hzone * int((tr_ed-tr_st)/n_hzone/n_hzone), 20), order='F')\
+				   	.reshape((n_hzone * n_hzone * int((tr_ed-tr_st)/n_hzone/n_hzone), 4), order='F')\
 									)) 
 			
 			idx_keep = np.where(weight_in!=0)
@@ -281,7 +281,7 @@ def PR_fit_tvar( q_PR, q_job, q_data, arr_states, proc_id):
 			R0_est = clf.predict( \
 						np.hstack(( COV_tvar_Xall[ each_t * n_hzone * n_hzone: (each_t + 1) * n_hzone * n_hzone, :],\
 					np.tile( np.expand_dims( np.expand_dims( COV_tstat_X, 0), 2), [n_hzone,1, 1, 1] )\
-					.reshape((n_hzone * n_hzone * 1, 20), order='F')\
+					.reshape((n_hzone * n_hzone * 1, 4), order='F')\
 				)) );
 			
 			# Get Standard Error of Beta Coefficients
@@ -568,7 +568,7 @@ def arg_parse():
 	#
 	parser.add_argument("--ds_crt", 		type=int,	help="Days for boundary correction", default=14)
 	parser.add_argument("--tol", 			type=float,	help="Tolerance for convergence", default=10**-3)
-	parser.add_argument("--max_itr", 		type=int,	help="# of maximum iterations", default=50)
+	parser.add_argument("--max_itr", 		type=int,	help="# of maximum iterations", default=10)
 	parser.add_argument("--n_proc", 		type=str,	help="Number of processes", default=7)
 	#
 	parser.add_argument("--st_date", 		type=str,	help="Prediction start date", default='2020-10-04')
@@ -642,6 +642,11 @@ def main():
 	# Load The raw data 
 	df_infect, df_death, df_demo, ls_arr_move, ls_date_move, ls_hzone_code_move, date_ranges = \
 		raw_data_load( path_demo, path_infect, path_death, path_movement )
+	
+	# Since the p-value of non pop and unit features are almost 1, we move it 
+	df_demo = df_demo[[ 'hzone_code', 'hzone_name', 'province', 'hzone_type', 'lat', 'lon',\
+			 'total_pop', 'number_of_urban_commercial_units',\
+			 'number_of_urban_industrial_units', 'number_of_urban_office_units']]
 	# Loop over each prediction start date 
 	each_date = pd.to_datetime( pd_date )
 	
