@@ -550,7 +550,7 @@ def EM_algm( mdl_path_save, n_dates_tr, n_dates_te, n_dates, n_feat_tvar, n_feat
 		'tolpval_coef_tvar':tolpval_coef_tvar, 'tolf_stat_coef_tvar':tolf_stat_coef_tvar,\
 		#'tolsdr_coef_tstat':tolsdr_coef_tstat, 'toltval_coef_tstat':toltval_coef_tstat,\
 		#'tolpval_coef_tstat':tolpval_coef_tstat, 'tolf_stat_coef_tstat':tolf_stat_coef_tstat,\
-		'COV_name': COV_name, 'tolcoef_tvar': tolcoef_tvar, 'tolcoef_tstat':tolcoef_tstat\
+		'COV_name': COV_name, 'tolcoef_tvar': tolcoef_tvar\
 		}
 	savemat(mdl_path_save, mdic)
 
