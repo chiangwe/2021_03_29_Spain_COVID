@@ -1,3 +1,7 @@
+# We are removing non-nesssary demo features
+# We include other such as age group
+# If we directly use demographic features it would be too big,
+# we resort for sampling.
 # %% ----- Import packages -----#
 
 import sys
@@ -70,6 +74,97 @@ ls_hzone_code_move = d['ls_hzone_code_move'];
 ls_date_move = d['ls_date_move'];
 d.close()
 
+#===================================# 
+ls_keep = [ 'hzone_code', 'hzone_name', 'province', \
+			'hzone_type', 'lat', 'lon', \
+			'number_of_urban_commercial_units', \
+			'number_of_urban_industrial_units', \
+			'number_of_urban_office_units' ]
+df_demo = df_demo[ls_keep]
+
+AgeGroup = pd.read_csv('../../../Raw_Dataset/Castilla/ProvinceAgeGroup/CYL_Population_AgeGroup_Province.csv')
+ProZone = pd.read_csv('../../../Raw_Dataset/Castilla/ProvinceAgeGroup/prov_hzone.csv')
+
+dict_zoneToProv = dict( zip(ProZone['hzone_code'], ProZone['province_name']) )
+
+ls_one   = [ each.replace(' ','_') for each in AgeGroup.keys()[1::3] ]
+Gender = [  each.replace(' ','_') for each in AgeGroup.iloc[0, :] ]
+
+newKey = ['Province'] + [None] * (AgeGroup.shape[1]-1)
+
+newKey[1::3] = [  gender+'_'+yr for gender,yr in zip(Gender[1::3], ls_one) ]
+newKey[2::3] = [  gender+'_'+yr for gender,yr in zip(Gender[2::3], ls_one) ]
+newKey[3::3] = [  gender+'_'+yr for gender,yr in zip(Gender[3::3], ls_one) ]
+
+AgeGroup = AgeGroup[1:]
+AgeGroup.columns = newKey
+AgeGroup['Province'] = AgeGroup['Province'].apply(lambda x: x.split(' ')[1])
+
+AgeGroup = AgeGroup.set_index('Province').astype(int)
+
+
+# Check VIF
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+# calculating VIF for each feature
+#vif_data = [variance_inflation_factor( df_age.iloc[:, 6:], i) for i in range(0, df_age.iloc[:, 6:].values.shape[1] )]
+#vif_age = [ variance_inflation_factor( AgeGroup.values[:, -3:], i) for i in range(0, AgeGroup.values[:, 3:].shape[1] ) ]
+
+AgeGroup_rest = AgeGroup.copy()
+cor_thresh = 0.6
+
+ls_index = [ 'Ambos_sexos_Total' ]
+AgeGroup_sel = AgeGroup_rest.loc[:, ls_index[-1] ]
+AgeGroup_rest = AgeGroup_rest.drop(ls_index, axis=1)
+
+arr_in = np.vstack((AgeGroup_rest.values.T, np.expand_dims(AgeGroup_sel.values,0 )))
+R1 = np.corrcoef( arr_in )
+
+#n_cor_larger = ( (R1 > cor_thresh ).sum() - R1.shape[0] ) > 0
+
+while( AgeGroup_rest.shape[1] > 0 ):
+
+	# Keep the total number for both sex
+	# Sort them out 
+	#idx = AgeGroup.keys().tolist().index(ls_index[-1])
+	
+	sort_id  = np.argsort(np.abs(R1[:-1, -1]))[::-1]
+	sort_r = R1[ :-1, -1]
+	sort_r = sort_r[sort_id]
+	sort_keys = AgeGroup_rest.keys()[sort_id]
+
+	# Select corr < 0.5
+	sel_keys = [ sort_keys[ each ] for each in np.where( [ sort_r < 0.5 ])[1] ]
+	sort_r = [ sort_r[ each ] for each in np.where( [ sort_r < 0.5 ])[1] ]
+	
+	AgeGroup_rest = AgeGroup_rest.loc[:, sel_keys]
+	
+	if AgeGroup_rest.shape[1] == 0:
+		break
+	ls_index.append( AgeGroup_rest.keys()[-1] )
+	AgeGroup_sel = AgeGroup_rest.loc[:, ls_index[-1] ]
+	AgeGroup_rest = AgeGroup_rest.drop(ls_index[-1], axis=1)
+
+	arr_in = np.vstack((AgeGroup_rest.values.T, np.expand_dims(AgeGroup_sel.values,0 )))
+	R1 = np.corrcoef( arr_in )
+
+	# n_cor_larger = ( (R1 > cor_thresh ).sum() - R1.shape[0] ) > 0
+	
+
+AgeGroup = AgeGroup.loc[:, ls_index]
+#==================================#
+
+df_age = df_demo.apply(lambda x: AgeGroup.loc[ dict_zoneToProv[x['hzone_code']]], axis=1)
+keys_temp = df_age.keys().tolist()
+
+df_age[['hzone_code', 'hzone_name', 'province', 'hzone_type', 'lat', 'lon']] =\
+df_demo[['hzone_code', 'hzone_name', 'province', 'hzone_type', 'lat', 'lon']]
+df_age = df_age[['hzone_code', 'hzone_name', 'province', 'hzone_type', 'lat', 'lon']+keys_temp]
+
+df_demo.iloc[:,6:] = (   df_demo.iloc[:,6:] - df_demo.iloc[:,6:].mean(0) )/df_demo.iloc[:,6:].std(0)
+df_age.iloc[:,6:] = (   df_age.iloc[:,6:] - df_age.iloc[:,6:].mean(0) )/df_age.iloc[:,6:].std(0)
+
+
 # ----- Align the mobility dates
 ls_date_move = [pd.to_datetime(each).strftime('%Y-%m-%d') for each in ls_date_move];
 date_covid = df_infect.keys()[6:]
@@ -109,10 +204,10 @@ parser = argparse.ArgumentParser()
 #
 parser.add_argument("--ds_crt", type=int, help="Days for boundary correction", default=14)
 parser.add_argument("--tol", type=float, help="Tolerance for convergence", default=10 ** -4)
-parser.add_argument("--max_itr", type=int, help="# of maximum iterations", default=60)
+parser.add_argument("--max_itr", type=int, help="# of maximum iterations", default=40)
 parser.add_argument("--mode", type=str, help="# of maximum iterations", default='server')
 #
-parser.add_argument("--mdl_name", type=str, help="# of maximum iterations", default='MHPsPRs')
+parser.add_argument("--mdl_name", type=str, help="# of maximum iterations", default='MHPsPRsVIFRmv')
 parser.add_argument("--case_type", type=str, help="# of maximum iterations", default='confirm')
 parser.add_argument("--alpha_shape", type=float, help="Shape parameters for wbl", default=0)
 parser.add_argument("--beta_scale", type=float, help="bandwidth for the kernel", default=0)
@@ -148,15 +243,13 @@ for each_date in tqdm(date_ranges[-1:]):
 	else:
 		para_str =  'type_' + case_type + '_alpha_' + str(int(alpha_shape)) + '_beta_' + str(int(beta_scale)) + '_predat_';
 	
-	#para_str = 'type_' + case_type	+ '_alpha_' + str(int(alpha_shape)) + '_beta_' + str(int(beta_scale)) + '_predat_';
-
 	mdl_path_save = './mdl/' + mdl_name + '/' + mdl_name + '_Spain_' + para_str + each_date.strftime(
 		"%Y-%m-%d") + '.mat';
 
 	# ------- Check trained ---------#
 	print(mdl_path_save)
-	if os.path.exists(mdl_path_save):
-		continue;
+	#if os.path.exists(mdl_path_save):
+		#continue;
 	# ----- Set initial parameters -----#
 
 	n_hzone = len(ls_hzone_code_move);
@@ -170,19 +263,21 @@ for each_date in tqdm(date_ranges[-1:]):
 
 	# ----- Make covariates  -----#
 
-	COV_name = ['movement'] + df_demo.keys().tolist()[6:]
+	#COV_name = ['movement'] + df_demo.keys().tolist()[6:]
+	COV_name = ['movement']
 	n_feat = len(COV_name)
-
-	COV = np.concatenate([ \
-		np.expand_dims(np.swapaxes(ls_arr_move[:, :, 0:n_dates], 0, 1), axis=3), \
-		np.tile(np.expand_dims(np.tile(df_demo.iloc[:, 6:].values, [n_hzone, 1, 1]), axis=2), [1, 1, n_dates, 1])],
-		axis=3)
+	
+	COV = np.expand_dims(np.swapaxes(ls_arr_move[:, :, 0:n_dates], 0, 1), axis=3);
+	#COV = np.concatenate([ \
+	#	np.expand_dims(np.swapaxes(ls_arr_move[:, :, 0:n_dates], 0, 1), axis=3), \
+	#	np.tile(np.expand_dims(np.tile(df_demo.iloc[:, 6:].values, [n_hzone, 1, 1]), axis=2), [1, 1, n_dates, 1])],
+	#	axis=3)
 
 	COV[:, :, :, 0] = np.log(COV[:, :, :, 0] + 1)
 
 	COV_X = COV[:, :, 0:n_dates_tr, :];
-	# COV_te = COV[:, :, n_dates_tr:, :];
-
+	
+	
 	# Training set with boundary correction
 	COV_X = np.reshape(COV_X[:, :, 0:n_dates_tr - ds_crt, :], [n_hzone * n_hzone * (n_dates_tr - ds_crt), n_feat],
 					   order='F')
@@ -203,8 +298,8 @@ for each_date in tqdm(date_ranges[-1:]):
 	
 	wbl_para = np.expand_dims( np.array([alpha_shape, beta_scale]), axis=1 )
 	
-	tolcoef = np.random.uniform(0.0005, 0.001, [COV_X.shape[1] + 1, 1])
-
+	#tolcoef = np.random.uniform(0.0005, 0.001, [COV_X.shape[1] + 1, 1])
+	tolcoef = np.random.uniform(0.0005, 0.001, [COV_X.shape[1] + df_demo.iloc[:,6:].shape[1] + df_age.iloc[:,6:].shape[1] +1, 1])
 
 	if case_type == 'confirm':
 		covids = df_infect.iloc[:, 6:].values[:, 0:n_dates_tr]
@@ -222,10 +317,9 @@ for each_date in tqdm(date_ranges[-1:]):
 	COV_t = np.unravel_index(range(0, COV.shape[0]), (n_hzone, n_hzone, n_dates), order='F')[2];
 	COV_X_t = np.unravel_index(range(0, COV_X.shape[0]), (n_hzone, n_hzone, n_dates_tr - ds_crt), order='F')[2];
 	COV_te_t = np.unravel_index(range(n_dates_tr, n_dates_tr + n_dates_te), (n_hzone, n_hzone, n_dates), order='F')[2];
-
+	
 	sample_weight = np.tile(covids[:, 0:n_dates_tr - ds_crt], [n_hzone, 1, 1]).flatten(order='F')
-
-
+	
 	# ================ EM step for all ==================================================#
 
 	for itr_em in range(0, max_itr):
@@ -317,27 +411,75 @@ for each_date in tqdm(date_ranges[-1:]):
 		# y[idx_rev_wght] = np.log(y[idx_rev_wght])
 
 		clf = linear_model.PoissonRegressor()
-
-		clf.fit(COV_X, y, sample_weight)
+		
+		#================== ======================# 
+		
+		#SampleIdx = np.random.choice( COV_X.shape[0], size=100000, replace=True)
+		SampleIdx = np.arange(0, COV_X.shape[0])
+		h_i, h_j, dId = np.unravel_index( SampleIdx, (n_hzone, n_hzone, (n_dates_tr - ds_crt) ), order='F')
+		
+		
+		#================== ======================#
+		
+		clf.fit( np.hstack(( COV_X[SampleIdx, :], np.hstack( (df_demo.iloc[h_j, 6:], df_age.iloc[h_j, 6:])) )), y[SampleIdx],\
+				 sample_weight[SampleIdx])
+		
+		#clf.fit(COV_X, y, sample_weight)
 
 		theta_est = clf.coef_;
 		intercept_est = clf.intercept_;
 		tolcoef_est = np.hstack((intercept_est, theta_est))
 		
 		# Get Standard Error of Beta Coefficients
-		sdr_coef     = stats.coef_se(   clf, COV_X, y )
-		# Get T-values of Beta Coefficients
-		tval_coef    = stats.coef_tval( clf, COV_X, y )
-		# Get P-values of Beta Coefficients
-		pval_coef    = stats.coef_pval( clf, COV_X, y )
-		# Get F-statistic
-		f_stat_coef  = stats.f_stat(    clf, COV_X, y )
-		# sdr_coef, tval_coef, pval_coef, f_stat_coef
+		sdr_coef     = stats.coef_se(   clf, np.hstack(( COV_X[SampleIdx, :],\
+					   np.hstack( (df_demo.iloc[h_j, 6:], df_age.iloc[h_j, 6:])) )),\
+					   y[SampleIdx] )
 		
+		# Get T-values of Beta Coefficients
+		tval_coef    = stats.coef_tval( clf, np.hstack(( COV_X[SampleIdx, :],\
+					    np.hstack( (df_demo.iloc[h_j, 6:], df_age.iloc[h_j, 6:])) )),\
+						y[SampleIdx])
+		
+		# Get P-values of Beta Coefficients
+		pval_coef    = stats.coef_pval( clf, np.hstack(( COV_X[SampleIdx, :],\
+						np.hstack( (df_demo.iloc[h_j, 6:], df_age.iloc[h_j, 6:])) )),\
+						y[SampleIdx])
+		print("pval_coef: ", pval_coef)
+		# Get F-statistic
+		f_stat_coef  = stats.f_stat(    clf, np.hstack(( COV_X[SampleIdx, :],\
+						np.hstack( (df_demo.iloc[h_j, 6:], df_age.iloc[h_j, 6:])) )),\
+						y[SampleIdx] )
+		
+		# sdr_coef, tval_coef, pval_coef, f_stat_coef
 		# theta_est = clf.coef_;
 		# intercept_est = clf.intercept_;
+		
+		'''
+		# Predict in chunk
+		chunk_size = int(COV.shape[0]/10);
+		ls_chunck = [ (i,i + chunk_size) for i in range(0, COV.shape[0], chunk_size )]
+		
+		R0_est = []
+		for each_chunk in tqdm(ls_chunck):
+			#
+			if each_chunk[1] >= (COV.shape[0]):
+				each_chunk = ( each_chunk[0], COV.shape[0])
+			h_i, h_j, dId = np.unravel_index( range(each_chunk[0],each_chunk[1]), \
+							(n_hzone, n_hzone, n_dates ), order='F')
+			#R0_est = clf.predict(COV);
+			r0_est = clf.predict( np.hstack(( COV[ each_chunk[0]:each_chunk[1],:],\
+								  np.hstack( (df_demo.iloc[h_j, 6:], df_age.iloc[h_j, 6:])) ))\
+								)
+			R0_est.append(r0_est)
+		
+		R0_est = np.hstack((R0_est))
+		'''
+		
+		SampleIdx = np.arange(0, COV.shape[0])
+		h_i, h_j, dId = np.unravel_index( SampleIdx, (n_hzone, n_hzone, n_dates ), order='F')
 
-		R0_est = clf.predict(COV);
+		R0_est = clf.predict( np.hstack(( COV[SampleIdx, :], np.hstack( (df_demo.iloc[h_j, 6:], df_age.iloc[h_j, 6:])) )) )
+		
 		R0_est[R0_est > 1] = 1;
 		R0_est = np.reshape(R0_est, [n_hzone, n_hzone, n_dates], order='F')
 		R0_est = R0_est[:, :, 0:n_dates_tr]
